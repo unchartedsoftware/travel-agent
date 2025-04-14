@@ -6,11 +6,16 @@ from langchain.prompts import ChatPromptTemplate
 from langchain.chains import LLMChain
 from langchain.tools import Tool
 from langchain.agents import initialize_agent, AgentType
+from dotenv import load_dotenv  # Added import
+import os  # Added import
 
-# API Keys (Replace with your actual keys)
-OPENWEATHERMAP_API_KEY = "YOUR_OPENWEATHERMAP_API_KEY"  # Replace with your actual OpenWeatherMap API key
-OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"  # Replace with your actual OpenAI API key
-OPENROUTE_SERVICE_API_KEY = ""  # Replace with your OpenRoute Service API Key
+# Load environment variables from .env file
+load_dotenv()  # Added line
+
+# API Keys (Loaded from .env file)
+OPENWEATHERMAP_API_KEY = os.getenv("OPENWEATHERMAP_API_KEY")  # Updated line
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # Updated line
+OPENROUTE_SERVICE_API_KEY = os.getenv("OPENROUTE_SERVICE_API_KEY")  # Updated line
 
 # Initialize LLM for LangChain
 llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=OPENAI_API_KEY)  # Or any other LLM you prefer
