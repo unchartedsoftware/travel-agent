@@ -6,6 +6,7 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from langgraph.prebuilt.chat_agent_executor import AgentState
 from dotenv import load_dotenv  # Added import
+import json
 import os  # Added import
 
 from typing import Literal
@@ -22,7 +23,7 @@ OPENROUTE_SERVICE_API_KEY = os.getenv("OPENROUTE_SERVICE_API_KEY")  # Updated li
 # Initialize LLM for LangChain
 model = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=OPENAI_API_KEY)  # Or any other LLM you prefer
 
-@tool
+# @tool
 def get_driving_route(stops: List[str], departure_time: datetime) -> Dict[str, Any]:
     """
     Gets driving directions and route information from OpenRoute Service API for multiple stops.
@@ -84,6 +85,8 @@ def get_driving_route(stops: List[str], departure_time: datetime) -> Dict[str, A
     }
     body = {
         "coordinates": coordinates,
+        "geometry_simplify": "true"
+        # "alternative_routes":{"target_count":2,"weight_factor":1.4,"share_factor":0.6},
     }
     try:
         response = requests.post(url, headers=headers, json=body)
@@ -121,7 +124,7 @@ def get_driving_route(stops: List[str], departure_time: datetime) -> Dict[str, A
     }
 
 
-@tool
+# @tool
 def get_weather_forecast(latitude: float, longitude: float, time: datetime) -> Dict[str, Any]:
     """
     Fetches weather forecast data for a specific location and time from OpenWeatherMap API.
@@ -162,7 +165,7 @@ def get_weather_forecast(latitude: float, longitude: float, time: datetime) -> D
         return None
 
 
-@tool
+# @tool
 def analyze_weather_conditions(weather_data: List[Dict[str, Any]]) -> List[str]:
     """
     Analyzes weather data for potential driving hazards.
@@ -197,7 +200,7 @@ def analyze_weather_conditions(weather_data: List[Dict[str, Any]]) -> List[str]:
     return hazards
 
 
-@tool
+# @tool
 def suggest_departure_time(route: Dict[str, Any], weather_data: List[Dict[str, Any]],
                           departure_time: datetime) -> datetime:
     """
@@ -243,57 +246,58 @@ def suggest_departure_time(route: Dict[str, Any], weather_data: List[Dict[str, A
             best_departure_time = alternative_departure_time
     return best_departure_time
 
-
-@tool
-def get_weather_along_route(route: Dict[str, Any], departure_time: datetime) -> List[Dict[str, Any]]:
+# @tool
+def get_weather_along_route(route_data: Dict[str, Any], departure_time: datetime) -> List[Dict[str, Any]]:
     """
-    Fetches weather forecast data along the driving route. This function now
-    correctly handles multi-leg routes and timezones.  OpenRoute Service returns
-    the entire route as one segment, so we'll estimate points along the route.
-
+    Fetches weather forecast data along a driving route, handling multi-segment routes and structured GeoJSON feature.
     Args:
-        route: The route data from OpenRoute Service API (directions result).
+        route: The route data from OpenRoute Service API (a Geojson feature which is a directions result).
         departure_time: The intended departure time.
-
     Returns:
         A list of weather data dictionaries, with each dictionary containing
         the weather at a point along the route at the estimated arrival time.
         Returns an empty list on error.
     """
     weather_data = []
-    route_geometry = route.get('geometry', {})
-    if not route_geometry or not route_geometry.get('coordinates'):
-        print("No route geometry found.")
-        return []
 
-    coordinates = route_geometry['coordinates']
-    total_duration = route.get('segments', [{}])[0].get('duration', 0)
-    if not total_duration:
-        print("No route duration found.")
-        return []
+    try:
+        geometry = route_data.get('geometry', {})
+        properties = route_data.get('properties', {})
+        segments = properties.get('segments', [])
 
-    num_points = 5  # Get weather at 5 points along the route
-    time_increment = total_duration / (num_points + 1)  # Duration between points
-    # distance_increment = total_duration / (num_points + 1) # Not used
+        coordinates = geometry.get('coordinates', [])
+        if not coordinates:
+            print("No coordinates found in geometry.")
+            return []
 
-    current_time = departure_time
-    for i in range(1, num_points + 1):
-        point_time = current_time + timedelta(seconds=time_increment * i)
+        total_duration = sum(segment.get('duration', 0) for segment in segments)
+        if total_duration == 0:
+            print("No route duration found.")
+            return []
 
-        # Get the coordinate for weather query.
-        point_index = int(len(coordinates) * i / (num_points + 1))
-        if point_index >= len(coordinates):
-            point_index = len(coordinates) - 1
-        lat = coordinates[point_index][1]
-        lng = coordinates[point_index][0]
-        weather = get_weather_forecast(lat, lng, point_time)
-        if weather:
-            weather['location'] = {'latitude': lat, 'longitude': lng}
-            weather_data.append(weather)
-        else:
-            print(f"Failed to get weather for location: {lat}, {lng}")
+        num_points = 10  # Number of points to sample along the route
+        time_increment = total_duration / (num_points + 1)
+        current_time = departure_time
+
+        for i in range(1, num_points + 1):
+            point_time = current_time + timedelta(seconds=time_increment * i)
+
+            # Estimate point index
+            point_index = int(len(coordinates) * i / (num_points + 1))
+            point_index = min(point_index, len(coordinates) - 1)
+
+            lng, lat = coordinates[point_index]
+            weather = get_weather_forecast(lat, lng, point_time)
+            if weather:
+                weather['location'] = {'latitude': lat, 'longitude': lng}
+                weather['time'] = point_time.isoformat()
+                weather_data.append(weather)
+            else:
+                print(f"Failed to get weather for location: {lat}, {lng} at {point_time}")
+    except Exception as e:
+        print(f"Error while processing route: {e}")
+
     return weather_data
-
 
 # @tool
 # def generate_itinerary_with_llm(origin: str, destination: str, departure_time_str: str) -> str:
@@ -374,9 +378,6 @@ if __name__ == "__main__":
     destination = "Chicago, Illinois, USA"
     departure_time_str = "2024-12-25T09:00:00"
 
-    # route_info = get_driving_route([origin, 'Fort Wayne, Indiana, USA', destination], datetime.fromisoformat(departure_time_str))
-    # get_weather_along_route(route_info['route'], datetime.fromisoformat(departure_time_str))
-
     prompt = f"I want a detailed itinerary for a trip from {origin} to {destination}, departing at {departure_time_str}.  What is the best time to leave to avoid bad weather?"
     messages = agent_executor.invoke({"messages": [("human", prompt)]})
     print(
@@ -385,3 +386,8 @@ if __name__ == "__main__":
             "output": messages["messages"][-1].content,
         }
     )
+
+    # route_info = get_driving_route([origin, 'Fort Wayne, Indiana, USA', destination], datetime.fromisoformat(departure_time_str))
+    # # [[-79.38171, 43.64877], [-85.12887, 41.113154], [-87.66063, 41.87897]]
+    # result = get_weather_along_route(route_info['route'], datetime.fromisoformat(departure_time_str))
+    # print(result)
