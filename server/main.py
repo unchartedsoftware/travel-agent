@@ -35,16 +35,44 @@ async def global_exception_handler(request, exc):
     )
 
 class TripRequest(BaseModel):
+    """
+    Represents a trip planning request from the client.
+    
+    Attributes:
+        start: Starting location address or city name.
+        end: Destination address or city name.
+        departure_time: ISO formatted departure time string (e.g. "2025-04-14T09:00:00").
+    """
     start: str
     end: str
     departure_time: str
     
 class WeatherStop(BaseModel):
+    """
+    Represents a stop along the route with associated weather information.
+    
+    Attributes:
+        location: Name or address of the location.
+        arrival_time: Expected arrival time at this location (ISO format).
+        weather: Weather description with temperature (e.g. "Partly cloudy, 15°C").
+    """
     location: str
     arrival_time: str
     weather: str
     
 class RouteOption(BaseModel):
+    """
+    Represents a complete route option with timing, weather risk assessment, and waypoints.
+    
+    Attributes:
+        id: Unique identifier for this route option.
+        departure_time: Suggested departure time in ISO format.
+        estimated_duration: Human-readable duration (e.g. "5 hours").
+        weather_risk: Risk assessment based on weather conditions ("Low", "Medium", or "High").
+        stops: List of WeatherStop objects representing waypoints along the route.
+        score: Route quality score from 0-100, considering weather and timing.
+        coordinates: List of [latitude, longitude] pairs defining the route geometry.
+    """
     id: int
     departure_time: str
     estimated_duration: str

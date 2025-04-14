@@ -7,6 +7,7 @@ dependencies = [
     "googlemaps>=4.10.0",
     "langchain>=0.3.23",
     "langchain-community>=0.0.13",
+    "langchain-openai>=0.3.12",
     "requests>=2.32.3",
     "fastapi>=0.110.0",
     "uvicorn>=0.27.0",
