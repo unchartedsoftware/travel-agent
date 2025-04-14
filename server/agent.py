@@ -24,7 +24,7 @@ def get_driving_route_wrapper(driving_route_input: str):
     """Parses the combined route input string."""
     parts = driving_route_input.split(" - ")
     if len(parts) == 3:
-        return get_driving_route(parts[0], parts[1], datetime.fromisoformat(parts[2]))
+        return get_driving_route(parts[0], parts[1], datetime.fromisoformat(parts[2].strip()))
     else:
         raise ValueError(f"Invalid route input format: {driving_route_input}. Expected 'origin - destination - departure_time'.")
 
@@ -366,7 +366,7 @@ tools = [
     Tool(
         name="get_driving_route",
         func=get_driving_route_wrapper,
-        description="Gets the driving route and estimated arrival time. Input should be the origin address, followed by ' - ' and then the destination address, followed by ' - ' and then the departure time in ISO8601 format (e.g., 'Toronto, Canada - Chicago, USA - 2024-12-25T09:00:00').",
+        description="Gets the driving route and estimated arrival time. Input should be the origin address, followed by ' - ' and then the destination address, followed by ' - ' and then the departure time in ISO8601 format (e.g., Toronto, Canada - Chicago, USA - 2024-12-25T09:00:00).",
     ),
     Tool(
         name="get_weather_forecast",
