@@ -23,19 +23,18 @@ llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=OPENAI_API_KEY)  # O
 def get_driving_route_wrapper(driving_route_input: str):
     """Parses the combined route input string."""
     parts = driving_route_input.split(" - ")
-    if len(parts) == 3:
-        return get_driving_route(parts[0], parts[1], datetime.fromisoformat(parts[2].strip()))
+    if len(parts) >= 3:
+        return get_driving_route(parts[:-1], datetime.fromisoformat(parts[-1].strip()))
     else:
-        raise ValueError(f"Invalid route input format: {driving_route_input}. Expected 'origin - destination - departure_time'.")
+        raise ValueError(f"Invalid route input format: {driving_route_input}. Expected 'origin [- stop] - destination - departure_time'.")
 
-
-def get_driving_route(origin: str, destination: str, departure_time: datetime) -> Dict[str, Any]:
+def get_driving_route(stops: List[str], departure_time: datetime) -> Dict[str, Any]:
     """
-    Gets driving directions and route information from OpenRoute Service API.
+    Gets driving directions and route information from OpenRoute Service API for multiple stops.
 
     Args:
-        origin: The origin address.
-        destination: The destination address.
+        stops: A list of addresses representing the stops in the route.  The first address is the origin,
+               and the last address is the destination, with any intermediate stops in between.
         departure_time: The departure time as a datetime object.
 
     Returns:
@@ -44,53 +43,56 @@ def get_driving_route(origin: str, destination: str, departure_time: datetime) -
             - 'estimated_arrival_time': The estimated arrival time as a datetime object in UTC.
             - 'total_duration': The total travel time in seconds.
             - 'route_summary': A human-readable summary of the route.
+            - 'waypoints': A list of dictionaries, where each dictionary contains the geocoded
+                          coordinates (longitude and latitude) for each stop.
     """
-    # Geocode origin and destination using OpenRoute Service Geocoding API
+    if not stops:
+        return {}
+
+    # Geocode all stops
     geocode_url = "https://api.openrouteservice.org/geocode/search"
     headers = {"Accept": "application/json, application/geo+json; charset=utf-8"}
-    geocode_params_origin = {
-        "api_key": OPENROUTE_SERVICE_API_KEY,
-        "text": origin,
-    }
-    geocode_params_destination = {
-        "api_key": OPENROUTE_SERVICE_API_KEY,
-        "text": destination,
-    }
+    waypoints = []
+    coordinates = []
 
-    try:
-        response_origin = requests.get(geocode_url, headers=headers, params=geocode_params_origin)
-        response_origin.raise_for_status()
-        origin_data = response_origin.json()
+    for stop in stops:
+        geocode_params = {
+            "api_key": OPENROUTE_SERVICE_API_KEY,
+            "text": stop,
+        }
+        try:
+            response = requests.get(geocode_url, headers=headers, params=geocode_params)
+            response.raise_for_status()
+            data = response.json()
+            if data and data['features']:
+                coordinates.append(data['features'][0]['geometry']['coordinates'])
+                waypoints.append({
+                    'address': stop,
+                    'coordinates': data['features'][0]['geometry']['coordinates']  # [longitude, latitude]
+                })
+            else:
+                print(f"Geocoding failed for stop: {stop}")
+                return {} # Return empty dict if any geocoding fails.  Consider alternative error handling.
 
-        response_destination = requests.get(geocode_url, headers=headers, params=geocode_params_destination)
-        response_destination.raise_for_status()
-        destination_data = response_destination.json()
-
-        origin_coordinates = origin_data['features'][0]['geometry']['coordinates']
-        destination_coordinates = destination_data['features'][0]['geometry']['coordinates']
-
-    except requests.exceptions.RequestException as e:
-        print(f"Error during geocoding: {e}")
-        return {}
-    except KeyError as e:
-        print(f"Error parsing geocoding response: {e}")
-        return {}
-
+        except requests.exceptions.RequestException as e:
+            print(f"Error during geocoding for stop {stop}: {e}")
+            return {}
+        except KeyError as e:
+            print(f"Error parsing geocoding response for stop {stop}: {e}")
+            return {}
     # Construct routing request
-    url = "https://api.openrouteservice.org/v2/directions/driving-car"
+    url = "https://api.openrouteservice.org/v2/directions/driving-car/geojson"
     headers = {
         "Accept": "application/json, application/geo+json, application/gpx+xml; charset=utf-8",
         "Authorization": OPENROUTE_SERVICE_API_KEY,
         "Content-Type": "application/json; charset=utf-8",
     }
     body = {
-        "start": origin_coordinates,
-        "end": destination_coordinates,
+        "coordinates": coordinates,
     }
-
     try:
         response = requests.post(url, headers=headers, json=body)
-        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+        response.raise_for_status()
         route_data = response.json()
     except requests.exceptions.RequestException as e:
         print(f"Error fetching route: {e}")
@@ -104,21 +106,24 @@ def get_driving_route(origin: str, destination: str, departure_time: datetime) -
         return {}
 
     route = route_data['features'][0]
-    segments = route.get('segments', [])
+    segments = route['properties'].get('segments', [])
     if not segments:
         print("No segments found in route.")
         return {}
-    duration = segments[0].get('duration', 0)
-    distance = route.get('distance', 0)  # in km.  The distance is in the top-level 'features'
+    duration = route['properties']['summary'].get('duration', 0) # seconds
+    distance = route['properties']['summary'].get('distance', 0) # meters
     arrival_time = departure_time + timedelta(seconds=duration)
 
-    route_summary = f"Drive from {origin} to {destination}. The total distance is {distance:.2f} km and the estimated travel time is {timedelta(seconds=duration)}."
+    route_summary = f"Drive from {stops[0]} to {stops[-1]} with stops at "
+    route_summary += ", ".join(stops[1:-1]) if len(stops) > 2 else "no intermediate stops"
+    route_summary += f". The total distance is {(distance / 1000):.2f} km and the estimated travel time is {timedelta(seconds=duration)} (hh:mm:ss)."
 
     return {
         'route': route,
         'estimated_arrival_time': arrival_time,
         'total_duration': duration,
         'route_summary': route_summary,
+        'waypoints': waypoints,
     }
 
 
@@ -366,7 +371,7 @@ tools = [
     Tool(
         name="get_driving_route",
         func=get_driving_route_wrapper,
-        description="Gets the driving route and estimated arrival time. Input should be the origin address, followed by ' - ' and then the destination address, followed by ' - ' and then the departure time in ISO8601 format (e.g., Toronto, Canada - Chicago, USA - 2024-12-25T09:00:00).",
+        description="Gets the driving route and estimated arrival time. Input should be a string containing the origin address, followed by one or more stop addresses (optional), followed by the destination address, and finally the departure time, all separated by ' - ' and then the departure time in ISO8601 format (e.g., Toronto, Ontario, Canada - Stop 1 - Stop 2 - Chicago, Illinois, USA - 2024-12-25T09:00:00).",
     ),
     Tool(
         name="get_weather_forecast",
@@ -400,8 +405,10 @@ agent = initialize_agent(
 
 if __name__ == "__main__":
     origin = "Toronto, Canada"
-    destination = "Chicago, USA"
+    destination = "Chicago, Illinois, USA"
     departure_time_str = "2024-12-25T09:00:00"
+
+    # get_driving_route([origin, 'Fort Wayne, Indiana, USA', destination], datetime.fromisoformat(departure_time_str))
 
     # Run the agent
     itinerary = agent.invoke(f"I want a detailed itinerary for a trip from {origin} to {destination}, departing at {departure_time_str}.  What is the best time to leave to avoid bad weather?")
