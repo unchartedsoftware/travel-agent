@@ -10,10 +10,17 @@ ai-trip-agent/
 │   ├── src/        # Source files for the client
 │   ├── public/     # Public assets
 │   └── ...         # Other client configuration files
-└── server/         # Python backend (coming soon)
+└── server/         # Python backend
+    ├── agent.py    # AI agent for route planning
+    └── ...         # Backend configuration files
 ```
 
 ## Development Setup
+
+### Prerequisites
+- Node.js 18 or higher
+- Python 3.12.0 or higher
+- [pyenv](https://github.com/pyenv/pyenv) (recommended for Python version management)
 
 ### Client (Vue.js Frontend)
 ```bash
@@ -25,8 +32,25 @@ npm install
 npm run dev
 ```
 
-### Server (Coming Soon)
-Python-based backend with AI capabilities for route planning and weather analysis.
+### Server (Python Backend)
+```bash
+# Set up Python environment
+cd server
+python -m venv venv
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
+
+# Install dependencies
+pip install -e .
+
+# Set up environment variables (create a .env file)
+cp .env.example .env
+# Edit .env with your API keys
+```
+
+Required API Keys:
+- Google Maps API key
+- OpenWeatherMap API key
+- OpenAI API key
 
 ## Scripts
 
