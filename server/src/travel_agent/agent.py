@@ -23,7 +23,7 @@ OPENROUTE_SERVICE_API_KEY = os.getenv("OPENROUTE_SERVICE_API_KEY")  # Updated li
 # Initialize LLM for LangChain
 model = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=OPENAI_API_KEY)  # Or any other LLM you prefer
 
-# @tool
+@tool
 def get_driving_route(stops: List[str], departure_time: datetime) -> Dict[str, Any]:
     """
     Gets driving directions and route information from OpenRoute Service API for multiple stops.
@@ -124,7 +124,7 @@ def get_driving_route(stops: List[str], departure_time: datetime) -> Dict[str, A
     }
 
 
-# @tool
+@tool
 def get_weather_forecast(latitude: float, longitude: float, time: datetime) -> Dict[str, Any]:
     """
     Fetches weather forecast data for a specific location and time from OpenWeatherMap API.
@@ -165,7 +165,7 @@ def get_weather_forecast(latitude: float, longitude: float, time: datetime) -> D
         return None
 
 
-# @tool
+@tool
 def analyze_weather_conditions(weather_data: List[Dict[str, Any]]) -> List[str]:
     """
     Analyzes weather data for potential driving hazards.
@@ -200,7 +200,7 @@ def analyze_weather_conditions(weather_data: List[Dict[str, Any]]) -> List[str]:
     return hazards
 
 
-# @tool
+@tool
 def suggest_departure_time(route: Dict[str, Any], weather_data: List[Dict[str, Any]],
                           departure_time: datetime) -> datetime:
     """
@@ -246,7 +246,7 @@ def suggest_departure_time(route: Dict[str, Any], weather_data: List[Dict[str, A
             best_departure_time = alternative_departure_time
     return best_departure_time
 
-# @tool
+@tool
 def get_weather_along_route(route_data: Dict[str, Any], departure_time: datetime) -> List[Dict[str, Any]]:
     """
     Fetches weather forecast data along a driving route, handling multi-segment routes and structured GeoJSON feature.
