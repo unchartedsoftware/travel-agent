@@ -1,7 +1,7 @@
 import requests
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Optional, Any
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.chains import LLMChain
 from langchain.tools import Tool
@@ -358,7 +358,7 @@ tools = [
     Tool(
         name="get_driving_route",
         func=get_driving_route,
-        description="Gets the driving route and estimated arrival time. Input should be the origin and destination addresses, and departure time in ISO8601 format.",
+        description="Gets the driving route and estimated arrival time. Input should be the origin address, followed by ' - ' and then the destination address, followed by ' - ' and then the departure time in ISO8601 format (e.g., 'Toronto, Canada - Chicago, USA - 2024-12-25T09:00:00').",
     ),
     Tool(
         name="get_weather_forecast",
@@ -396,5 +396,5 @@ if __name__ == "__main__":
     departure_time_str = "2024-12-25T09:00:00"
 
     # Run the agent
-    itinerary = agent.run(f"I want a detailed itinerary for a trip from {origin} to {destination}, departing at {departure_time_str}.  What is the best time to leave to avoid bad weather?")
+    itinerary = agent.invoke(f"I want a detailed itinerary for a trip from {origin} to {destination}, departing at {departure_time_str}.  What is the best time to leave to avoid bad weather?")
     print(itinerary)
