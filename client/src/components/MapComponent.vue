@@ -22,6 +22,7 @@ const mapContainer = ref<HTMLElement | null>(null);
 let map: L.Map | null = null;
 let routeLine: L.Polyline | null = null;
 let weatherMarkers: L.Marker[] = [];
+const apiKey = '11fcb59c7eec3a76e6b54c1b93b590a7';
 
 onMounted(() => {
   if (mapContainer.value) {
@@ -29,6 +30,26 @@ onMounted(() => {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
+	L.tileLayer(`https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${apiKey}`, {
+		attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+		opacity: 0.6
+	}).addTo(map);
+	L.tileLayer(`https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=${apiKey}`, {
+		attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+		opacity: 0.6
+	}).addTo(map);
+	L.tileLayer(`https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=${apiKey}`, {
+		attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+		opacity: 0.6
+	}).addTo(map);
+	L.tileLayer(`https://tile.openweathermap.org/map/snow/{z}/{x}/{y}.png?appid=${apiKey}`, {
+		attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+		opacity: 0.6
+	}).addTo(map);
+	L.tileLayer(`https://tile.openweathermap.org/map/rain_new/{z}/{x}/{y}.png?appid=${apiKey}`, {
+		attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+		opacity: 0.6
+	}).addTo(map);
   }
 });
 

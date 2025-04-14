@@ -10,18 +10,23 @@ import Card from 'primevue/card';
 import InputText from 'primevue/inputtext';
 import Calendar from 'primevue/calendar';
 import Button from 'primevue/button';
+import type { TripFormData } from '../models/types';
 
 const startLocation = ref('');
 const endLocation = ref('');
-const earliestDepartureDate = ref(null);
+const earliestDepartureDate = ref<Date | null>(null);
 
-const emit = defineEmits(['planTrip']);
+const emit = defineEmits<{
+  (e: 'planTrip', data: TripFormData): void
+}>();
 
 const submitForm = () => {
+  if (!earliestDepartureDate.value) return;
+
   emit('planTrip', {
     start: startLocation.value,
     end: endLocation.value,
-    departureDate: earliestDepartureDate.value
+    departureDate: earliestDepartureDate.value.toISOString()
   });
 };
 </script>

@@ -2,6 +2,7 @@ import requests
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Optional, Any
 from langchain_openai import ChatOpenAI
+# from langchain_community.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.chains import LLMChain
 from langchain.tools import Tool
