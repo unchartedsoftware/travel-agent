@@ -2,13 +2,15 @@ import requests
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Optional, Any
 from langchain_openai import ChatOpenAI
-# from langchain_community.chat_models import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
-from langchain.chains import LLMChain
-from langchain.tools import Tool
-from langchain.agents import initialize_agent, AgentType
+from langchain_core.tools import tool
+from langgraph.errors import GraphRecursionError
+from langgraph.prebuilt import create_react_agent
+from langgraph.prebuilt.chat_agent_executor import AgentState
 from dotenv import load_dotenv  # Added import
 import os  # Added import
+
+from typing import Literal
+
 
 # Load environment variables from .env file
 load_dotenv()  # Added line
@@ -19,16 +21,9 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # Updated line
 OPENROUTE_SERVICE_API_KEY = os.getenv("OPENROUTE_SERVICE_API_KEY")  # Updated line
 
 # Initialize LLM for LangChain
-llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=OPENAI_API_KEY)  # Or any other LLM you prefer
+model = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=OPENAI_API_KEY)  # Or any other LLM you prefer
 
-def get_driving_route_wrapper(driving_route_input: str):
-    """Parses the combined route input string."""
-    parts = driving_route_input.split(" - ")
-    if len(parts) >= 3:
-        return get_driving_route(parts[:-1], datetime.fromisoformat(parts[-1].strip()))
-    else:
-        raise ValueError(f"Invalid route input format: {driving_route_input}. Expected 'origin [- stop] - destination - departure_time'.")
-
+@tool
 def get_driving_route(stops: List[str], departure_time: datetime) -> Dict[str, Any]:
     """
     Gets driving directions and route information from OpenRoute Service API for multiple stops.
@@ -118,7 +113,6 @@ def get_driving_route(stops: List[str], departure_time: datetime) -> Dict[str, A
     route_summary = f"Drive from {stops[0]} to {stops[-1]} with stops at "
     route_summary += ", ".join(stops[1:-1]) if len(stops) > 2 else "no intermediate stops"
     route_summary += f". The total distance is {(distance / 1000):.2f} km and the estimated travel time is {timedelta(seconds=duration)} (hh:mm:ss)."
-
     return {
         'route': route,
         'estimated_arrival_time': arrival_time,
@@ -128,7 +122,7 @@ def get_driving_route(stops: List[str], departure_time: datetime) -> Dict[str, A
     }
 
 
-
+@tool
 def get_weather_forecast(latitude: float, longitude: float, time: datetime) -> Dict[str, Any]:
     """
     Fetches weather forecast data for a specific location and time from OpenWeatherMap API.
@@ -169,7 +163,7 @@ def get_weather_forecast(latitude: float, longitude: float, time: datetime) -> D
         return None
 
 
-
+@tool
 def analyze_weather_conditions(weather_data: List[Dict[str, Any]]) -> List[str]:
     """
     Analyzes weather data for potential driving hazards.
@@ -204,7 +198,7 @@ def analyze_weather_conditions(weather_data: List[Dict[str, Any]]) -> List[str]:
     return hazards
 
 
-
+@tool
 def suggest_departure_time(route: Dict[str, Any], weather_data: List[Dict[str, Any]],
                           departure_time: datetime) -> datetime:
     """
@@ -251,7 +245,7 @@ def suggest_departure_time(route: Dict[str, Any], weather_data: List[Dict[str, A
     return best_departure_time
 
 
-
+@tool
 def get_weather_along_route(route: Dict[str, Any], departure_time: datetime) -> List[Dict[str, Any]]:
     """
     Fetches weather forecast data along the driving route. This function now
@@ -302,7 +296,7 @@ def get_weather_along_route(route: Dict[str, Any], departure_time: datetime) -> 
     return weather_data
 
 
-
+@tool
 def generate_itinerary_with_llm(origin: str, destination: str, departure_time_str: str) -> str:
     """
     Generates a travel itinerary with weather considerations using a Large Language Model (LLM).
@@ -348,7 +342,7 @@ def generate_itinerary_with_llm(origin: str, destination: str, departure_time_st
         ("system", "You are a helpful travel assistant that provides detailed and friendly travel itineraries, including weather information and recommendations for optimal departure times."),
         ("user", "I am planning a trip from {origin} to {destination}, departing at {departure_time}. Please provide a detailed itinerary, including information about the weather conditions along the route and the best time to depart to avoid bad weather."),
     ])
-    llm_chain = LLMChain(llm=llm, prompt=prompt_template)
+    llm_chain = LLMChain(llm=model, prompt=prompt_template)
 
     # Create the input for the LLM.
     inputs = {
@@ -365,52 +359,30 @@ def generate_itinerary_with_llm(origin: str, destination: str, departure_time_st
 
     return itinerary_response
 
-
-
-# Define tools
 tools = [
-    Tool(
-        name="get_driving_route",
-        func=get_driving_route_wrapper,
-        description="Gets the driving route and estimated arrival time. Input should be a string containing the origin address, followed by one or more stop addresses (optional), followed by the destination address, and finally the departure time, all separated by ' - ' and then the departure time in ISO8601 format (e.g., Toronto, Ontario, Canada - Stop 1 - Stop 2 - Chicago, Illinois, USA - 2024-12-25T09:00:00).",
-    ),
-    Tool(
-        name="get_weather_forecast",
-        func=get_weather_forecast,
-        description="Fetches the weather forecast for a specific location and time. Input should be latitude, longitude, and time in ISO8601 format.",
-    ),
-    Tool(
-        name="get_weather_along_route",
-        func=get_weather_along_route,
-        description="Fetches the weather forecast data along the driving route.  Input is the route from get_driving_route, and the departure time.",
-    ),
-    Tool(
-        name="suggest_departure_time",
-        func=suggest_departure_time,
-        description="Suggests the optimal departure time based on weather conditions along the route. Input should be the route information and weather data.",
-    ),
-    Tool(
-        name="generate_itinerary",
-        func=generate_itinerary_with_llm,
-        description="Generates a user-friendly travel itinerary with weather considerations. Input should be the origin, destination, and departure time.",
-    ),
+    get_driving_route,
+    get_weather_forecast,
+    get_weather_along_route,
+    analyze_weather_conditions,
+    suggest_departure_time,
+    generate_itinerary_with_llm,
 ]
 
-# Initialize the agent
-agent = initialize_agent(
-    tools=tools,
-    llm=llm,
-    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,  # Or use a different agent type
-    verbose=True,  # Set to True to see the agent's reasoning
-)
+agent_executor = create_react_agent(model, tools)
 
 if __name__ == "__main__":
     origin = "Toronto, Canada"
     destination = "Chicago, Illinois, USA"
     departure_time_str = "2024-12-25T09:00:00"
 
-    # get_driving_route([origin, 'Fort Wayne, Indiana, USA', destination], datetime.fromisoformat(departure_time_str))
+    # route_info = get_driving_route([origin, 'Fort Wayne, Indiana, USA', destination], datetime.fromisoformat(departure_time_str))
+    # get_weather_along_route(route_info['route'], datetime.fromisoformat(departure_time_str))
 
-    # Run the agent
-    itinerary = agent.invoke(f"I want a detailed itinerary for a trip from {origin} to {destination}, departing at {departure_time_str}.  What is the best time to leave to avoid bad weather?")
-    print(itinerary)
+    prompt = f"I want a detailed itinerary for a trip from {origin} to {destination}, departing at {departure_time_str}.  What is the best time to leave to avoid bad weather?"
+    messages = agent_executor.invoke({"messages": [("human", prompt)]})
+    print(
+        {
+            "input": prompt,
+            "output": messages["messages"][-1].content,
+        }
+    )
