@@ -1,7 +1,7 @@
 googlemaps==4.10.0
 langchain==0.3.23
 langchain-community==0.3.21
-langchain-openai===0.3.12
+langchain-openai==0.3.12
 requests==2.32.3
 dotenv==0.9.9
 openai==1.74.0
