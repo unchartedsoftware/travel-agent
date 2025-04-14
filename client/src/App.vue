@@ -8,6 +8,7 @@ import WeatherInfo from './components/WeatherInfo.vue'
 const currentRoute = ref(null);
 const weatherData = ref(null);
 const routeOptions = ref([]);
+const weatherApiKey = ref('11fcb59c7eec3a76e6b54c1b93b590a7');
 
 const handleTripPlan = async (formData: {
   start: string;
@@ -100,17 +101,17 @@ const handleTripPlan = async (formData: {
 <template>
   <div class="layout-container">
     <header class="header">
-      <h1>AI Trip Planner</h1>
+      <h1>Weather Travel Agent</h1>
     </header>
 
     <main class="main-content">
       <div class="grid w-full m-0">
         <div class="col-12 lg:col-4 p-2">
           <TripPlanningForm @plan-trip="handleTripPlan" />
-          <WeatherInfo v-if="currentRoute[0]" :location="currentRoute[0]" />
+          <WeatherInfo v-if="currentRoute && currentRoute[0]" :location="currentRoute[0]" :apikey="weatherApiKey" />
         </div>
         <div class="col-12 lg:col-8 p-2">
-          <MapComponent :route="currentRoute" :weather-data="weatherData" />
+          <MapComponent :route="currentRoute" :weather-data="weatherData" :weatherApiKey="weatherApiKey" />
         </div>
       </div>
       <div class="grid w-full m-0" v-if="routeOptions.length > 0">
