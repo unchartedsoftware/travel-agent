@@ -1,7 +1,5 @@
-import googlemaps
 import requests
 from datetime import datetime, timedelta
-# import pytz  # For time zone handling  - Not used.
 from typing import List, Tuple, Dict, Optional, Any
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
@@ -10,19 +8,17 @@ from langchain.tools import Tool
 from langchain.agents import initialize_agent, AgentType
 
 # API Keys (Replace with your actual keys)
-GOOGLE_MAPS_API_KEY = "YOUR_GOOGLE_MAPS_API_KEY"  #  Replace with your actual Google Maps API key
 OPENWEATHERMAP_API_KEY = "YOUR_OPENWEATHERMAP_API_KEY"  # Replace with your actual OpenWeatherMap API key
 OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"  # Replace with your actual OpenAI API key
-
-# Initialize Google Maps client
-gmaps = googlemaps.Client(key=GOOGLE_MAPS_API_KEY)
+OPENROUTE_SERVICE_API_KEY = ""  # Replace with your OpenRoute Service API Key
 
 # Initialize LLM for LangChain
 llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=OPENAI_API_KEY)  # Or any other LLM you prefer
 
+
 def get_driving_route(origin: str, destination: str, departure_time: datetime) -> Dict[str, Any]:
     """
-    Gets driving directions and route information from Google Maps API.
+    Gets driving directions and route information from OpenRoute Service API.
 
     Args:
         origin: The origin address.
@@ -31,48 +27,85 @@ def get_driving_route(origin: str, destination: str, departure_time: datetime) -
 
     Returns:
         A dictionary containing:
-            - 'route': The detailed route information from Google Maps.
+            - 'route': The detailed route information from OpenRoute Service.
             - 'estimated_arrival_time': The estimated arrival time as a datetime object in UTC.
             - 'total_duration': The total travel time in seconds.
             - 'route_summary': A human-readable summary of the route.
     """
+    # Geocode origin and destination using OpenRoute Service Geocoding API
+    geocode_url = "https://api.openrouteservice.org/geocode/search"
+    headers = {"Accept": "application/json, application/geo+json; charset=utf-8"}
+    geocode_params_origin = {
+        "api_key": OPENROUTE_SERVICE_API_KEY,
+        "text": origin,
+    }
+    geocode_params_destination = {
+        "api_key": OPENROUTE_SERVICE_API_KEY,
+        "text": destination,
+    }
+
     try:
-        directions_result = gmaps.directions(
-            origin,
-            destination,
-            mode="driving",
-            departure_time=departure_time,
-            units="metric"  # Get distances in metric units
-        )
-    except Exception as e:
-        print(f"Error fetching directions: {e}")
+        response_origin = requests.get(geocode_url, headers=headers, params=geocode_params_origin)
+        response_origin.raise_for_status()
+        origin_data = response_origin.json()
+
+        response_destination = requests.get(geocode_url, headers=headers, params=geocode_params_destination)
+        response_destination.raise_for_status()
+        destination_data = response_destination.json()
+
+        origin_coordinates = origin_data['features'][0]['geometry']['coordinates']
+        destination_coordinates = destination_data['features'][0]['geometry']['coordinates']
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error during geocoding: {e}")
+        return {}
+    except KeyError as e:
+        print(f"Error parsing geocoding response: {e}")
         return {}
 
-    if not directions_result:
-        print("No directions found.")
+    # Construct routing request
+    url = "https://api.openrouteservice.org/v2/directions/driving-car"
+    headers = {
+        "Accept": "application/json, application/geo+json, application/gpx+xml; charset=utf-8",
+        "Authorization": OPENROUTE_SERVICE_API_KEY,
+        "Content-Type": "application/json; charset=utf-8",
+    }
+    body = {
+        "start": origin_coordinates,
+        "end": destination_coordinates,
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=body)
+        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+        route_data = response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching route: {e}")
+        return {}
+    except KeyError as e:
+        print(f"Error parsing route data: {e}")
         return {}
 
-    route = directions_result[0]  # Get the first route
-    legs = route.get('legs', [])
-    if not legs:
-        print("No legs found in route.")
+    if not route_data or not route_data.get('features'):
+        print("No route found.")
         return {}
 
-    # Calculate total duration
-    total_duration = sum(leg.get('duration', {}).get('value', 0) for leg in legs)
+    route = route_data['features'][0]
+    segments = route.get('segments', [])
+    if not segments:
+        print("No segments found in route.")
+        return {}
+    duration = segments[0].get('duration', 0)
+    distance = route.get('distance', 0)  # in km.  The distance is in the top-level 'features'
+    arrival_time = departure_time + timedelta(seconds=duration)
 
-    # Get arrival time.  Google Maps returns arrival_time as a string.  Convert it to datetime in UTC.
-    arrival_time_str = legs[0].get('arrival_time')  # Arrival time of the first leg
-    arrival_time_utc = datetime.fromisoformat(arrival_time_str.replace('Z', '+00:00'))  # Handle Zulu time
-
-    # Create a route summary
-    route_summary = f"Drive from {origin} to {destination}. The total distance is {legs[0]['distance']['text']} and the estimated travel time is {legs[0]['duration']['text']}."
+    route_summary = f"Drive from {origin} to {destination}. The total distance is {distance:.2f} km and the estimated travel time is {timedelta(seconds=duration)}."
 
     return {
         'route': route,
-        'estimated_arrival_time': arrival_time_utc,
-        'total_duration': total_duration,
-        'route_summary': route_summary
+        'estimated_arrival_time': arrival_time,
+        'total_duration': duration,
+        'route_summary': route_summary,
     }
 
 
@@ -136,30 +169,30 @@ def analyze_weather_conditions(weather_data: List[Dict[str, Any]]) -> List[str]:
         description = weather[0].get('description', '').lower()
         temperature = data.get('main', {}).get('temp', 0)
         wind_speed = data.get('wind', {}).get('speed', 0)
-        time = datetime.utcfromtimestamp(data['dt']) #added line
+        time = datetime.utcfromtimestamp(data['dt'])  # added line
 
         if "snow" in description or "sleet" in description:
-            hazards.append(f"Snow/Sleet at {time.strftime('%Y-%m-%d %H:%M')}") #modified line
+            hazards.append(f"Snow/Sleet at {time.strftime('%Y-%m-%d %H:%M')}")  # modified line
         elif "heavy rain" in description:
-            hazards.append(f"Heavy Rain at {time.strftime('%Y-%m-%d %H:%M')}")#modified line
+            hazards.append(f"Heavy Rain at {time.strftime('%Y-%m-%d %H:%M')}")  # modified line
         elif "fog" in description:
-            hazards.append(f"Fog at {time.strftime('%Y-%m-%d %H:%M')}")#modified line
+            hazards.append(f"Fog at {time.strftime('%Y-%m-%d %H:%M')}")  # modified line
         elif temperature < 0:
-            hazards.append(f"Freezing Temperatures ({temperature}°C) at {time.strftime('%Y-%m-%d %H:%M')}")#modified line
+            hazards.append(f"Freezing Temperatures ({temperature}°C) at {time.strftime('%Y-%m-%d %H:%M')}")  # modified line
         elif wind_speed > 15:  # Consider 15 m/s as a threshold for strong winds
-            hazards.append(f"Strong Winds ({wind_speed} m/s) at {time.strftime('%Y-%m-%d %H:%M')}")#modified line
+            hazards.append(f"Strong Winds ({wind_speed} m/s) at {time.strftime('%Y-%m-%d %H:%M')}")  # modified line
 
     return hazards
 
 
 
 def suggest_departure_time(route: Dict[str, Any], weather_data: List[Dict[str, Any]],
-                           departure_time: datetime) -> datetime:
+                          departure_time: datetime) -> datetime:
     """
     Suggests an optimal departure time based on weather conditions along the route.
 
     Args:
-        route: The route data from Google Maps.
+        route: The route data from OpenRoute Service.
         weather_data: The weather forecast data for the route.
         departure_time: the departure time the user wants to depart
 
@@ -183,12 +216,12 @@ def suggest_departure_time(route: Dict[str, Any], weather_data: List[Dict[str, A
 
     # Calculate the time with the least hazards.
     best_departure_time = departure_time
-    min_hazards = len(hazards) # Start with the number of hazards at the original departure time
+    min_hazards = len(hazards)  # Start with the number of hazards at the original departure time
 
     # Check a few departure times around the original time
     for i in range(-2, 3):  # Check 2 hours before and 2 hours after
         alternative_departure_time = departure_time + timedelta(hours=i)
-        #Get new weather data for the alternative departure time
+        # Get new weather data for the alternative departure time
         alternative_weather_data = get_weather_along_route(route, alternative_departure_time)
         alternative_hazards = analyze_weather_conditions(alternative_weather_data)
         num_hazards = len(alternative_hazards)
@@ -198,13 +231,16 @@ def suggest_departure_time(route: Dict[str, Any], weather_data: List[Dict[str, A
             best_departure_time = alternative_departure_time
     return best_departure_time
 
+
+
 def get_weather_along_route(route: Dict[str, Any], departure_time: datetime) -> List[Dict[str, Any]]:
     """
-    Fetches weather forecast data along the driving route.  This function now
-    correctly handles multi-leg routes and timezones.
+    Fetches weather forecast data along the driving route. This function now
+    correctly handles multi-leg routes and timezones.  OpenRoute Service returns
+    the entire route as one segment, so we'll estimate points along the route.
 
     Args:
-        route: The route data from Google Maps API (directions result).
+        route: The route data from OpenRoute Service API (directions result).
         departure_time: The intended departure time.
 
     Returns:
@@ -213,42 +249,39 @@ def get_weather_along_route(route: Dict[str, Any], departure_time: datetime) -> 
         Returns an empty list on error.
     """
     weather_data = []
-    legs = route.get('legs', [])
-    if not legs:
-        print("No legs found in route to get weather.")
+    route_geometry = route.get('geometry', {})
+    if not route_geometry or not route_geometry.get('coordinates'):
+        print("No route geometry found.")
         return []
 
+    coordinates = route_geometry['coordinates']
+    total_duration = route.get('segments', [{}])[0].get('duration', 0)
+    if not total_duration:
+        print("No route duration found.")
+        return []
+
+    num_points = 5  # Get weather at 5 points along the route
+    time_increment = total_duration / (num_points + 1)  # Duration between points
+    # distance_increment = total_duration / (num_points + 1) # Not used
+
     current_time = departure_time
-    for leg in legs:
-        # Get the arrival time at the *end* of this leg.
-        arrival_time_str = leg.get('arrival_time')
-        if not arrival_time_str:
-            print("Leg missing arrival_time.")
-            return []
-        arrival_time = datetime.fromisoformat(arrival_time_str.replace('Z', '+00:00'))
+    for i in range(1, num_points + 1):
+        point_time = current_time + timedelta(seconds=time_increment * i)
 
-        # Get the latitude and longitude for weather query.  Use the *end* location.
-        end_location = leg.get('end_location')
-        if not end_location:
-            print("Leg missing end_location.")
-            return []
-        end_lat = end_location.get('lat')
-        end_lng = end_location.get('lng')
-
-        # Fetch weather data for the arrival time
-        weather = get_weather_forecast(end_lat, end_lng, arrival_time)
+        # Get the coordinate for weather query.
+        point_index = int(len(coordinates) * i / (num_points + 1))
+        if point_index >= len(coordinates):
+            point_index = len(coordinates) - 1
+        lat = coordinates[point_index][1]
+        lng = coordinates[point_index][0]
+        weather = get_weather_forecast(lat, lng, point_time)
         if weather:
-            # Store the location (lat/lng) with the weather data.
-            weather['location'] = {'latitude': end_lat, 'longitude': end_lng}
+            weather['location'] = {'latitude': lat, 'longitude': lng}
             weather_data.append(weather)
         else:
-            print(f"Failed to get weather for location: {end_lat}, {end_lng}")
-
-        # Update current_time for the next leg.  Start the next leg at the
-        # arrival time of the *previous* leg.
-        current_time = arrival_time
-
+            print(f"Failed to get weather for location: {lat}, {lng}")
     return weather_data
+
 
 
 def generate_itinerary_with_llm(origin: str, destination: str, departure_time_str: str) -> str:
@@ -320,12 +353,12 @@ tools = [
     Tool(
         name="get_driving_route",
         func=get_driving_route,
-        description="Gets the driving route and estimated arrival time from Google Maps. Input should be the origin and destination addresses, and departure time in আইএসও8601 format.",
+        description="Gets the driving route and estimated arrival time. Input should be the origin and destination addresses, and departure time in ISO8601 format.",
     ),
     Tool(
         name="get_weather_forecast",
         func=get_weather_forecast,
-        description="Fetches the weather forecast for a specific location and time. Input should be latitude, longitude, and time in আইএসও8601 format.",
+        description="Fetches the weather forecast for a specific location and time. Input should be latitude, longitude, and time in ISO8601 format.",
     ),
     Tool(
         name="get_weather_along_route",
