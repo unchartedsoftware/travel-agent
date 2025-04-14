@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import TripPlanningForm from './components/TripPlanningForm.vue'
 import MapComponent from './components/MapComponent.vue'
 import RouteResults from './components/RouteResults.vue'
+import WeatherInfo from './components/WeatherInfo.vue'
 
 const currentRoute = ref(null);
 const weatherData = ref(null);
@@ -106,6 +107,7 @@ const handleTripPlan = async (formData: {
       <div class="grid w-full m-0">
         <div class="col-12 lg:col-4 p-2">
           <TripPlanningForm @plan-trip="handleTripPlan" />
+          <WeatherInfo v-if="currentRoute[0]" :location="currentRoute[0]" />
         </div>
         <div class="col-12 lg:col-8 p-2">
           <MapComponent :route="currentRoute" :weather-data="weatherData" />
