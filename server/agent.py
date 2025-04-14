@@ -20,6 +20,14 @@ OPENROUTE_SERVICE_API_KEY = os.getenv("OPENROUTE_SERVICE_API_KEY")  # Updated li
 # Initialize LLM for LangChain
 llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=OPENAI_API_KEY)  # Or any other LLM you prefer
 
+def get_driving_route_wrapper(driving_route_input: str):
+    """Parses the combined route input string."""
+    parts = driving_route_input.split(" - ")
+    if len(parts) == 3:
+        return get_driving_route(parts[0], parts[1], datetime.fromisoformat(parts[2]))
+    else:
+        raise ValueError(f"Invalid route input format: {driving_route_input}. Expected 'origin - destination - departure_time'.")
+
 
 def get_driving_route(origin: str, destination: str, departure_time: datetime) -> Dict[str, Any]:
     """
@@ -357,7 +365,7 @@ def generate_itinerary_with_llm(origin: str, destination: str, departure_time_st
 tools = [
     Tool(
         name="get_driving_route",
-        func=get_driving_route,
+        func=get_driving_route_wrapper,
         description="Gets the driving route and estimated arrival time. Input should be the origin address, followed by ' - ' and then the destination address, followed by ' - ' and then the departure time in ISO8601 format (e.g., 'Toronto, Canada - Chicago, USA - 2024-12-25T09:00:00').",
     ),
     Tool(
