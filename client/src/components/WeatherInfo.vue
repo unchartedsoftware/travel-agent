@@ -14,16 +14,28 @@
     </div>
 </template>
   
-  <script setup>
+  <script setup lang="ts">
   import { ref, watch } from 'vue';
   import axios from 'axios';
   
-  const props = defineProps({
-    location: Object,
-    apikey: String
-  });
+  const props = defineProps<{
+    location: [number, number];
+  }>();
   
-  const weather = ref(null);
+  const weather = ref<{
+    name: string;
+    main: {
+      temp: number;
+      humidity: number;
+    };
+    weather: Array<{
+      description: string;
+    }>;
+    wind: {
+      speed: number;
+    };
+  } | null>(null);
+  
   const loading = ref(false);
   const apiKey = '11fcb59c7eec3a76e6b54c1b93b590a7';
   
@@ -42,4 +54,3 @@
     }
   }, { immediate: true });
   </script>
-  

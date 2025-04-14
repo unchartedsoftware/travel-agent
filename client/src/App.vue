@@ -4,94 +4,48 @@ import TripPlanningForm from './components/TripPlanningForm.vue'
 import MapComponent from './components/MapComponent.vue'
 import RouteResults from './components/RouteResults.vue'
 import WeatherInfo from './components/WeatherInfo.vue'
+import type { WeatherStop, TripFormData, RouteOption } from './models/types'
 
-const currentRoute = ref(null);
-const weatherData = ref(null);
-const routeOptions = ref([]);
 const weatherApiKey = ref('11fcb59c7eec3a76e6b54c1b93b590a7');
+const currentRoute = ref<[number, number][] | null>(null);
+const weatherData = ref<Array<{position: [number, number], forecast: string, temperature: number}> | null>(null);
+const routeOptions = ref<RouteOption[]>([]);
 
-const handleTripPlan = async (formData: {
-  start: string;
-  end: string;
-  departureDate: string;
-}) => {
+const handleTripPlan = async (formData: TripFormData) => {
   try {
-    // TODO: Replace with actual API calls
-    // This is mock data for demonstration
-    currentRoute.value = [
-      [40.7128, -74.0060], // New York
-      [41.8781, -87.6298], // Chicago
-      [44.9778, -93.2650]  // Minneapolis
-    ];
-    
-    weatherData.value = [
-      {
-        position: [40.7128, -74.0060],
-        forecast: "Clear",
-        temperature: 72
+    const response = await fetch('http://localhost:8000/api/plan-trip', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      {
-        position: [41.8781, -87.6298],
-        forecast: "Partly Cloudy",
-        temperature: 68
-      },
-      {
-        position: [44.9778, -93.2650],
-        forecast: "Sunny",
-        temperature: 65
-      }
-    ];
-    
-    routeOptions.value = [
-      {
-        id: 1,
-        departureTime: "2025-04-13 08:00",
-        estimatedDuration: "12 hours",
-        weatherRisk: "Low",
-        score: 85,
-        stops: [
-          {
-            location: "New York, NY",
-            arrivalTime: "Start",
-            weather: "Clear, 72°F"
-          },
-          {
-            location: "Chicago, IL",
-            arrivalTime: "2025-04-13 14:00",
-            weather: "Partly Cloudy, 68°F"
-          },
-          {
-            location: "Minneapolis, MN",
-            arrivalTime: "2025-04-13 20:00",
-            weather: "Sunny, 65°F"
-          }
-        ]
-      },
-      {
-        id: 2,
-        departureTime: "2025-04-13 10:00",
-        estimatedDuration: "13 hours",
-        weatherRisk: "Medium",
-        score: 75,
-        stops: [
-          {
-            location: "New York, NY",
-            arrivalTime: "Start",
-            weather: "Clear, 72°F"
-          },
-          {
-            location: "Cleveland, OH",
-            arrivalTime: "2025-04-13 15:00",
-            weather: "Rain, 62°F"
-          },
-          {
-            location: "Minneapolis, MN",
-            arrivalTime: "2025-04-13 23:00",
-            weather: "Cloudy, 60°F"
-          }
-        ]
-      }
-    ];
+      body: JSON.stringify({
+        start: formData.start,
+        end: formData.end,
+        departure_time: formData.departureDate
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch route options');
+    }
+
+    const data = await response.json();
+
+    // Update route display with the first route option's coordinates
+    if (data[0]) {
+      currentRoute.value = data[0].coordinates;
+
+      // Transform weather data for display, matching each stop with the next coordinate
+      // (since weather data is for the destination of each leg)
+      weatherData.value = data[0].stops.map((stop: WeatherStop, index: number) => ({
+        position: data[0].coordinates[index + 1] as [number, number],  // Use next coordinate since weather is for destination
+        forecast: stop.weather.split(',')[0],
+        temperature: parseInt(stop.weather.split(',')[1])
+      }));
+    }
+
+    routeOptions.value = data;
+
   } catch (error) {
     console.error('Error planning trip:', error);
   }
@@ -108,7 +62,7 @@ const handleTripPlan = async (formData: {
       <div class="grid w-full m-0">
         <div class="col-12 lg:col-4 p-2">
           <TripPlanningForm @plan-trip="handleTripPlan" />
-          <WeatherInfo v-if="currentRoute && currentRoute[0]" :location="currentRoute[0]" :apikey="weatherApiKey" />
+          <WeatherInfo v-if="currentRoute && currentRoute.length > 0" :location="currentRoute[0]" />
         </div>
         <div class="col-12 lg:col-8 p-2">
           <MapComponent :route="currentRoute" :weather-data="weatherData" :weatherApiKey="weatherApiKey" />

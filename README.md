@@ -11,7 +11,11 @@ ai-trip-agent/
 │   ├── public/     # Public assets
 │   └── ...         # Other client configuration files
 └── server/         # Python backend
-    ├── agent.py    # AI agent for route planning
+    ├── src/        # Source directory
+    │   └── travel_agent/  # Python package
+    │       ├── __init__.py
+    │       └── agent.py   # AI agent for route planning
+    ├── main.py     # FastAPI server
     └── ...         # Backend configuration files
 ```
 
@@ -39,13 +43,18 @@ cd server
 python -m venv venv
 source venv/bin/activate  # On Windows use: venv\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies in development mode
+pip install -e .
 
 # Set up environment variables (create a .env file)
 cp .env.example .env
 # Edit .env with your API keys
+
+# Start the FastAPI server
+python main.py
 ```
+
+The FastAPI server will start on http://localhost:8000. You can access the API documentation at http://localhost:8000/docs.
 
 Required API Keys:
 - Google Maps API key
@@ -54,6 +63,6 @@ Required API Keys:
 
 ## Scripts
 
-- `npm run client:dev` - Start the client development server
+- `npm run client:dev` - Start the client development server (runs on http://localhost:5173)
 - `npm run client:build` - Build the client for production
 - `npm run client:preview` - Preview the client production build
