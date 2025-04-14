@@ -8,5 +8,5 @@ dotenv==0.9.9
 openai==1.74.0
 fastapi==0.110.0
 uvicorn==0.27.0
-pydantic==2.6.0
+pydantic==2.7.4
 python-dotenv==1.0.0
