@@ -1,6 +1,6 @@
 {
-  "name": "ai-trip-agent",
-  "version": "1.0.0",
+  "name": "travel-agent",
+  "version": "0.0.1",
   "description": "AI-powered trip planning application with weather integration",
   "scripts": {
     "client:dev": "cd client && npm run dev",

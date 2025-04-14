@@ -10,21 +10,9 @@ import Timeline from 'primevue/timeline';
 import Accordion from 'primevue/accordion';
 import AccordionTab from 'primevue/accordiontab';
 import Tag from 'primevue/tag';
+import type { RouteOption } from '../models/types';
 
-interface RouteOption {
-  id: number;
-  departureTime: string;
-  estimatedDuration: string;
-  weatherRisk: 'Low' | 'Medium' | 'High';
-  stops: Array<{
-    location: string;
-    arrivalTime: string;
-    weather: string;
-  }>;
-  score: number;
-}
-
-const props = defineProps<{
+defineProps<{
   routes: RouteOption[];
 }>();
 
@@ -61,7 +49,7 @@ const getWeatherRiskSeverity = (risk: string) => {
               </div>
             </div>
           </template>
-          
+
           <Timeline :value="route.stops" class="w-full mt-3">
             <template #content="slotProps">
               <div class="timeline-item w-full">
@@ -71,7 +59,7 @@ const getWeatherRiskSeverity = (risk: string) => {
               </div>
             </template>
           </Timeline>
-          
+
           <div class="mt-3">
             <Tag :severity="getWeatherRiskSeverity(route.weatherRisk)">
               Weather Risk: {{ route.weatherRisk }}
