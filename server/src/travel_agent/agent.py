@@ -438,6 +438,7 @@ if __name__ == "__main__":
     # ):
     #     step["messages"][-1].pretty_print()
 
+    # Testing the functions directly
     route_info = get_driving_route.func([origin, 'Fort Wayne, Indiana, USA', destination], datetime.fromisoformat(departure_time_str))
     add_legs_to_route(route_info['route'], datetime.fromisoformat(departure_time_str))
     print(route_info['route']['legs'])
