@@ -4,6 +4,7 @@ import TripPlanningForm from './components/TripPlanningForm.vue'
 import MapComponent from './components/MapComponent.vue'
 import RouteResults from './components/RouteResults.vue'
 import WeatherInfo from './components/WeatherInfo.vue'
+import ProgressSpinner from 'primevue/progressspinner'
 import type { WeatherStop, TripFormData, RouteOption } from './models/types'
 import { getFutureForecastAtTime } from './utilities/weather.ts';
 
@@ -11,9 +12,11 @@ const weatherApiKey = ref('11fcb59c7eec3a76e6b54c1b93b590a7');
 const currentRoute = ref<[number, number][] | null>(null);
 const weatherData = ref<Array<{position: [number, number], forecast: string, temperature: number}> | null>(null);
 const routeOptions = ref<RouteOption[]>([]);
+const isLoading = ref(false);
 
 const handleTripPlan = async (formData: TripFormData) => {
   try {
+    isLoading.value = true;
     const response = await fetch('http://localhost:8000/api/plan-trip', {
       method: 'POST',
       headers: {
@@ -52,6 +55,8 @@ const handleTripPlan = async (formData: TripFormData) => {
 
   } catch (error) {
     console.error('Error planning trip:', error);
+  } finally {
+    isLoading.value = false;
   }
 };
 </script>
@@ -69,7 +74,13 @@ const handleTripPlan = async (formData: TripFormData) => {
           <WeatherInfo v-if="weatherData && weatherData.length > 0" :weather="weatherData[0]" />
         </div>
         <div class="col-12 lg:col-8 p-2">
-          <MapComponent :route="currentRoute" :weather-data="weatherData" :weatherApiKey="weatherApiKey" />
+          <div class="relative">
+            <MapComponent :route="currentRoute" :weather-data="weatherData" :weatherApiKey="weatherApiKey" />
+            <div v-if="isLoading" class="loading-overlay">
+              <ProgressSpinner />
+              <div class="loading-text">Planning your trip...</div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="grid w-full m-0" v-if="routeOptions.length > 0">
@@ -126,5 +137,30 @@ const handleTripPlan = async (formData: TripFormData) => {
 :deep(.leaflet-container) {
   width: 100% !important;
   height: 600px !important;
+}
+
+.relative {
+  position: relative;
+}
+
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  z-index: 1000;
+}
+
+.loading-text {
+  color: var(--primary-color);
+  font-size: 1.2rem;
+  font-weight: 500;
 }
 </style>
