@@ -122,7 +122,7 @@ async def plan_trip(request: TripRequest):
         logger.debug("Fetching route information")
         route_info = agent.get_driving_route.func([request.start, request.end], departure_time)
         agent.add_legs_to_route(route_info['route'], departure_time)
-        route_info["route"]["geometry"] = openrouteservice.convert.decode_polyline(route_info["route"].get('geometry', ''))
+        route_info["route"]["geometry_decoded"] = openrouteservice.convert.decode_polyline(route_info["route"].get('geometry', ''))
         
         if not route_info:
             logger.warning("No route found")
@@ -190,7 +190,7 @@ async def plan_trip(request: TripRequest):
         if optimal_time != departure_time:
             optimal_route_info = agent.get_driving_route.func([request.start, request.end], optimal_time)
             agent.add_legs_to_route(optimal_route_info['route'], optimal_time)
-            optimal_route_info["route"]["geometry"] = openrouteservice.convert.decode_polyline(optimal_route_info["route"].get('geometry', ''))
+            optimal_route_info["route"]["geometry_decoded"] = openrouteservice.convert.decode_polyline(optimal_route_info["route"].get('geometry', ''))
             optimal_weather = agent.get_weather_along_route.func(optimal_route_info['route'], optimal_time)
 
             optimal_route = RouteOption(
