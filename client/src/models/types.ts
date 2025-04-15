@@ -42,10 +42,10 @@ export interface RouteOption {
  * @interface TripFormData
  * @property {string} start - Starting location address or city name
  * @property {string} end - Destination address or city name
- * @property {string} departureDate - ISO formatted departure time string (e.g. "2025-04-14T09:00:00")
+ * @property {string} departure_time - ISO formatted departure time string (e.g. "2025-04-14T09:00:00")
  */
 export interface TripFormData {
   start: string;
   end: string;
-  departureDate: string;
+  departure_time: string;
 }
