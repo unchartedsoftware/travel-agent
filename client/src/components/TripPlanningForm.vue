@@ -9,6 +9,7 @@ import { ref } from 'vue';
 import Card from 'primevue/card';
 import InputText from 'primevue/inputtext';
 import Calendar from 'primevue/calendar';
+
 import Button from 'primevue/button';
 import type { TripFormData } from '../models/types';
 
@@ -61,9 +62,11 @@ const submitForm = () => {
         <div class="field w-full">
           <span class="p-float-label w-full">
             <Calendar
+              :showTime="true"
+              :hourFormat="12"
               id="departureDate"
               v-model="earliestDepartureDate"
-              dateFormat="yy-mm-dd"
+              dateFormat="yy-mm-dd hh:mm"
               class="w-full"
               showIcon
             />
