@@ -63,7 +63,7 @@ const submitForm = () => {
           <span class="p-float-label w-full">
             <Calendar
               :showTime="true"
-              :hourFormat="24"
+              :hourFormat="`24`"
               id="departureDate"
               v-model="earliestDepartureDate"
               dateFormat="yy-mm-dd hh:mm"
