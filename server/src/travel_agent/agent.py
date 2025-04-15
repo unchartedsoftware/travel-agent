@@ -441,6 +441,7 @@ def passthrough_llm_function(origin: str, destination: str, departure_time: str)
     itinerary_response = chain.invoke(inputs)
     return itinerary_response
 
+# Available tools for the agent to use
 tools = [
     # get_driving_route,
     get_weather_forecast,
@@ -448,7 +449,7 @@ tools = [
     # analyze_weather_conditions,
     # suggest_departure_time,
     generate_itinerary_with_llm,
-    passthrough_llm_function,
+    # passthrough_llm_function,
 ]
 
 memory = MemorySaver()
@@ -463,23 +464,23 @@ if __name__ == "__main__":
     prompt = f"I want a detailed itinerary for a trip from {origin} to {destination}, departing at {departure_time_str}.  What is the best time to leave to avoid bad weather?"
     # prompt = f"I want to know the weather from {origin} to {destination}. How's the weather along th route?"
 
-    # # Use the agent
-    # config = {"configurable": {"thread_id": "abc123"}}
-    # for step in agent_executor.stream(
-    #     {"messages": [HumanMessage(content=prompt)]},
-    #     config,
-    #     stream_mode="values",
-    # ):
-    #     step["messages"][-1].pretty_print()
+    # Use the agent
+    config = {"configurable": {"thread_id": "abc123"}}
+    for step in agent_executor.stream(
+        {"messages": [HumanMessage(content=prompt)]},
+        config,
+        stream_mode="values",
+    ):
+        step["messages"][-1].pretty_print()
 
-    # Testing the functions directly
-    route_info = get_driving_route.func([origin, 'Fort Wayne, Indiana, USA', destination], datetime.fromisoformat(departure_time_str))
-    add_legs_to_route(route_info['route'], datetime.fromisoformat(departure_time_str))
-    print(route_info['route']['legs'])
-    weather_data = get_weather_along_route.func(route_info['route'], datetime.fromisoformat(departure_time_str))
-    print(weather_data)
-    weather_conditions = analyze_weather_conditions.func(weather_data)
-    print(weather_conditions)
-    departure_time = suggest_departure_time.func(route_info['route'], weather_data, datetime.fromisoformat(departure_time_str))
-    print(departure_time)
+    # # Testing the functions directly
+    # route_info = get_driving_route.func([origin, 'Fort Wayne, Indiana, USA', destination], datetime.fromisoformat(departure_time_str))
+    # add_legs_to_route(route_info['route'], datetime.fromisoformat(departure_time_str))
+    # print(route_info['route']['legs'])
+    # weather_data = get_weather_along_route.func(route_info['route'], datetime.fromisoformat(departure_time_str))
+    # print(weather_data)
+    # weather_conditions = analyze_weather_conditions.func(weather_data)
+    # print(weather_conditions)
+    # departure_time = suggest_departure_time.func(route_info['route'], weather_data, datetime.fromisoformat(departure_time_str))
+    # print(departure_time)
 
