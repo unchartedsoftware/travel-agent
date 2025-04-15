@@ -84,6 +84,9 @@ const submitForm = () => {
 </template>
 
 <style scoped>
+button {
+  color: black;
+}
 .field {
   margin-bottom: 1.5rem;
   width: 100%;
