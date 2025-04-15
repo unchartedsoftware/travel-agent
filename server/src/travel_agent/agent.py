@@ -465,13 +465,17 @@ def passthrough_llm_function(origin: str, destination: str, departure_time: str)
 
 # Available tools for the agent to use
 tools = [
-    # get_driving_route,
     get_weather_forecast,
     get_weather_forecast_for_next_5_days,
+    generate_itinerary_with_llm,
+
+    # get_driving_route, # it's common to encounter token limit issue with this function within the agent since the output is too long.
+
+    # Note: It seems the agent is having hard time figuring out how to use and pass the complex data structures as input arguments to following functions.
+    # These functions are not usable in the agent yet.
     # get_weather_along_route,
     # analyze_weather_conditions,
     # suggest_departure_time,
-    generate_itinerary_with_llm,
     # passthrough_llm_function,
 ]
 
