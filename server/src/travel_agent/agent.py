@@ -261,6 +261,7 @@ def suggest_departure_time(route: Dict[str, Any], weather_data: List[Dict[str, A
 
     # Analyze weather conditions
     hazards = analyze_weather_conditions.func(weather_data)
+    print(hazards)
 
     if not hazards:
         return departure_time
@@ -274,7 +275,8 @@ def suggest_departure_time(route: Dict[str, Any], weather_data: List[Dict[str, A
     min_hazards = len(hazards)  # Start with the number of hazards at the original departure time
 
     # Check a few departure times around the original time
-    for i in range(-2, 3):  # Check 2 hours before and 2 hours after
+    # for i in [-48, -24, -15, -9, -3, 3, 6, 9, 12, 15, 21, 24, 36, 48, 72, 96]:  # Check 24 hours before and 727 hours after the original time for every 3 hours (weather forecast interval is 3 hours)
+    for i in [3, 6, 9, 12, 15, 21, 24, 36, 48, 72, 96]:  # Current weather forecast doesn't seem to give the previous data.
         alternative_departure_time = departure_time + timedelta(hours=i)
         # Get new weather data for the alternative departure time
         alternative_weather_data = get_weather_along_route.func(route, alternative_departure_time)
