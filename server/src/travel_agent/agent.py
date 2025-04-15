@@ -5,6 +5,10 @@ from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from langgraph.prebuilt.chat_agent_executor import AgentState
+from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.messages import HumanMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv  # Added import
 import json
 import os  # Added import
@@ -23,6 +27,37 @@ OPENROUTE_SERVICE_API_KEY = os.getenv("OPENROUTE_SERVICE_API_KEY")  # Updated li
 
 # Initialize LLM for LangChain
 model = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=OPENAI_API_KEY)  # Or any other LLM you prefer
+
+# Add legs to the route for backward compatibility with existing frontend code
+def add_legs_to_route(route: Dict[str, Any], departure_time: datetime):
+    geometry = openrouteservice.convert.decode_polyline(route.get('geometry', ''))
+    coordinates = geometry.get('coordinates', [])
+    segments = route.get('segments', [])
+    if not segments:
+        print("No segments found in route.")
+        return {}
+    route['legs'] = []
+
+    arrival_time = departure_time
+
+    # Add legs for backward compatibility with existing frontend code
+    for i in range(len(segments)):
+        for j in range(len(segments[i]['steps']) - 1):
+            step = segments[i]['steps'][j]
+            next_step = segments[i]['steps'][j + 1]
+
+            arrival_time = arrival_time + timedelta(seconds=step["duration"])
+            way_points = step.get('way_points', [])
+            leg = {
+                'distance': {'text': f'{step['distance'] / 1000} km'},
+                'duration': {'text': f'{step['duration'] / 1000} hours'},
+                'start_address': step['name'],
+                'end_address': next_step['name'],
+                'arrival_time': arrival_time.isoformat(),
+                'start_location': {'lat': coordinates[way_points[0]][1], 'lng': coordinates[way_points[0]][0]},
+                'end_location': {'lat': coordinates[way_points[1]][1], 'lng': coordinates[way_points[1]][0]}
+            }
+            route['legs'].append(leg)
 
 @tool
 def get_driving_route(stops: List[str], departure_time: datetime) -> Dict[str, Any]:
@@ -197,9 +232,7 @@ def analyze_weather_conditions(weather_data: List[Dict[str, Any]]) -> List[str]:
             hazards.append(f"Heavy Rain at {time.strftime('%Y-%m-%d %H:%M')}")  # modified line
         elif "fog" in description:
             hazards.append(f"Fog at {time.strftime('%Y-%m-%d %H:%M')}")  # modified line
-        # elif temperature < 0:
-        #     hazards.append(f"Freezing Temperatures ({temperature}°C) at {time.strftime('%Y-%m-%d %H:%M')}")  # modified line
-        elif temperature < 13: # For testing, consider 20°C as a threshold for freezing
+        elif temperature < 0:
             hazards.append(f"Freezing Temperatures ({temperature}°C) at {time.strftime('%Y-%m-%d %H:%M')}")  # modified line
         elif wind_speed > 15:  # Consider 15 m/s as a threshold for strong winds
             hazards.append(f"Strong Winds ({wind_speed} m/s) at {time.strftime('%Y-%m-%d %H:%M')}")  # modified line
@@ -227,7 +260,7 @@ def suggest_departure_time(route: Dict[str, Any], weather_data: List[Dict[str, A
         return departure_time
 
     # Analyze weather conditions
-    hazards = analyze_weather_conditions(weather_data)
+    hazards = analyze_weather_conditions.func(weather_data)
 
     if not hazards:
         return departure_time
@@ -244,8 +277,8 @@ def suggest_departure_time(route: Dict[str, Any], weather_data: List[Dict[str, A
     for i in range(-2, 3):  # Check 2 hours before and 2 hours after
         alternative_departure_time = departure_time + timedelta(hours=i)
         # Get new weather data for the alternative departure time
-        alternative_weather_data = get_weather_along_route(route, alternative_departure_time)
-        alternative_hazards = analyze_weather_conditions(alternative_weather_data)
+        alternative_weather_data = get_weather_along_route.func(route, alternative_departure_time)
+        alternative_hazards = analyze_weather_conditions.func(alternative_weather_data)
         num_hazards = len(alternative_hazards)
 
         if num_hazards < min_hazards:
@@ -257,6 +290,7 @@ def suggest_departure_time(route: Dict[str, Any], weather_data: List[Dict[str, A
 def get_weather_along_route(route: Dict[str, Any], departure_time: datetime) -> List[Dict[str, Any]]:
     """
     Fetches weather forecast data along a driving route, handling multi-segment routes.
+    This function must be called after get_driving_route and route must be passed to it.
     Args:
         route: The route data from OpenRoute Service.
         departure_time: The intended departure time.
@@ -281,7 +315,7 @@ def get_weather_along_route(route: Dict[str, Any], departure_time: datetime) -> 
             print("No route duration found.")
             return []
 
-        num_points = 10  # Number of points to sample along the route
+        num_points = 5  # Number of points to sample along the route
         time_increment = total_duration / (num_points + 1)
         current_time = departure_time
 
@@ -293,7 +327,7 @@ def get_weather_along_route(route: Dict[str, Any], departure_time: datetime) -> 
             point_index = min(point_index, len(coordinates) - 1)
 
             lng, lat = coordinates[point_index]
-            weather = get_weather_forecast(lat, lng, point_time)
+            weather = get_weather_forecast.func(lat, lng, point_time)
             if weather:
                 weather['location'] = {'latitude': lat, 'longitude': lng}
                 weather['time'] = point_time.isoformat()
@@ -305,79 +339,84 @@ def get_weather_along_route(route: Dict[str, Any], departure_time: datetime) -> 
 
     return weather_data
 
-# @tool
-# def generate_itinerary_with_llm(origin: str, destination: str, departure_time_str: str) -> str:
-#     """
-#     Generates a travel itinerary with weather considerations using a Large Language Model (LLM).
+@tool
+def generate_itinerary_with_llm(origin: str, destination: str, departure_time_str: str) -> str:
+    """
+    Generates a travel itinerary with weather considerations using a Large Language Model (LLM).
 
-#     Args:
-#         origin: The origin address.
-#         destination: The destination address.
-#         departure_time_str: The departure time as a string.
+    Args:
+        origin: The origin address.
+        destination: The destination address.
+        departure_time_str: The departure time as a string.
 
-#     Returns:
-#         A string containing the itinerary and weather recommendations generated by the LLM.
-#     """
-#     try:
-#         departure_time = datetime.fromisoformat(departure_time_str)
-#     except ValueError:
-#         return "Invalid departure time format. Please use %Y-%m-%dT%H:%M:%S format."
+    Returns:
+        A string containing the itinerary and weather recommendations generated by the LLM.
+    """
+    try:
+        departure_time = datetime.fromisoformat(departure_time_str)
+    except ValueError:
+        return "Invalid departure time format. Please use %Y-%m-%dT%H:%M:%S format."
 
-#     route_info = get_driving_route(origin, destination, departure_time)
-#     if not route_info:
-#         return "Could not retrieve route information."
+    route_info = get_driving_route.func([origin, destination], departure_time)
+    add_legs_to_route(route_info['route'], departure_time)
+    if not route_info:
+        return "Could not retrieve route information."
 
-#     weather_data = get_weather_along_route(route_info['route'], departure_time)
-#     optimal_departure_time = suggest_departure_time(route_info['route'], weather_data, departure_time)
 
-#     # Format the weather data into a string that the LLM can understand
-#     weather_summary = ""
-#     if weather_data:
-#         weather_summary = "Here is the weather forecast for your trip:\n"
-#         for data in weather_data:
-#             forecast_time = datetime.utcfromtimestamp(data['dt'])
-#             weather_summary += (
-#                 f"- At {forecast_time.strftime('%Y-%m-%d %H:%M')}, near "
-#                 f"({data['location']['latitude']:.2f}, {data['location']['longitude']:.2f}): "
-#                 f"{data['weather'][0]['description']}, "
-#                 f"Temperature: {data['main']['temp']}°C, "
-#                 f"Wind: {data['wind']['speed']} m/s.\n"
-#             )
-#     else:
-#         weather_summary = "There is no weather data available for this route."
+    weather_data = get_weather_along_route.func(route_info['route'], departure_time)
+    optimal_departure_time = suggest_departure_time.func(route_info['route'], weather_data, departure_time)
 
-#     # Use LLM to generate a more natural-language itinerary
-#     prompt_template = ChatPromptTemplate.from_messages([
-#         ("system", "You are a helpful travel assistant that provides detailed and friendly travel itineraries, including weather information and recommendations for optimal departure times."),
-#         ("user", "I am planning a trip from {origin} to {destination}, departing at {departure_time}. Please provide a detailed itinerary, including information about the weather conditions along the route and the best time to depart to avoid bad weather."),
-#     ])
-#     llm_chain = LLMChain(llm=model, prompt=prompt_template)
+    # Format the weather data into a string that the LLM can understand
+    weather_summary = ""
+    if weather_data:
+        weather_summary = "Here is the weather forecast for your trip:\n"
+        for data in weather_data:
+            forecast_time = datetime.fromtimestamp(data['dt'], tz=timezone.utc)
+            weather_summary += (
+                f"- At {forecast_time.strftime('%Y-%m-%d %H:%M')}, near "
+                f"({data['location']['latitude']:.2f}, {data['location']['longitude']:.2f}): "
+                f"{data['weather'][0]['description']}, "
+                f"Temperature: {data['main']['temp']}°C, "
+                f"Wind: {data['wind']['speed']} m/s.\n"
+            )
+    else:
+        weather_summary = "There is no weather data available for this route."
+    
+    # Use LLM to generate a more natural-language itinerary
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "You are a helpful travel assistant that provides detailed and friendly travel itineraries, including weather information and recommendations for optimal departure times."),
+        ("user", "I am planning a trip from {origin} to {destination}, departing at {departure_time}. Please provide a detailed itinerary, including information about the weather conditions along the route and the best time to depart to avoid bad weather. Consider {route_summary}, {weather_conditions}, and {optimal_departure_time}."),
+    ])
 
-#     # Create the input for the LLM.
-#     inputs = {
-#         "origin": origin,
-#         "destination": destination,
-#         "departure_time": departure_time.strftime('%Y-%m-%d %H:%M:%S'),
-#         "route_summary": route_info['route_summary'],
-#         "weather_conditions": weather_summary,
-#         "optimal_departure_time": optimal_departure_time.strftime('%Y-%m-%d %H:%M:%S'),
-#     }
+    chain = prompt | ChatOpenAI() | StrOutputParser()
 
-#     # Generate the itinerary using the LLM
-#     itinerary_response = llm_chain.run(inputs)
+    # Create the input for the LLM.
+    inputs = {
+        "origin": origin,
+        "destination": destination,
+        "departure_time": departure_time.strftime('%Y-%m-%d %H:%M:%S'),
+        # "route_summary": json.dumps({ "legs": route_info['route']['legs'], "summary": route_info['route_summary'] }),
+        "route_summary": { "legs": route_info['route']['legs'], "summary": route_info['route_summary'] },
+        "weather_conditions": weather_summary,
+        "optimal_departure_time": optimal_departure_time.strftime('%Y-%m-%d %H:%M:%S'),
+    }
 
-#     return itinerary_response
+    # Generate the itinerary using the LLM
+    itinerary_response = chain.invoke(inputs)
+
+    return itinerary_response
 
 tools = [
-    get_driving_route,
+    # get_driving_route,
     get_weather_forecast,
-    get_weather_along_route,
-    analyze_weather_conditions,
-    suggest_departure_time,
-    # generate_itinerary_with_llm,
+    # get_weather_along_route,
+    # analyze_weather_conditions,
+    # suggest_departure_time,
+    generate_itinerary_with_llm,
 ]
 
-agent_executor = create_react_agent(model, tools)
+memory = MemorySaver()
+agent_executor = create_react_agent(model, tools, checkpointer=memory)
 
 if __name__ == "__main__":
     origin = "Toronto, Canada"
@@ -386,21 +425,24 @@ if __name__ == "__main__":
     departure_time_str = "2025-04-14T09:00:00"
 
     prompt = f"I want a detailed itinerary for a trip from {origin} to {destination}, departing at {departure_time_str}.  What is the best time to leave to avoid bad weather?"
-    messages = agent_executor.invoke({"messages": [("human", prompt)]})
-    print(
-        {
-            "input": prompt,
-            "output": messages["messages"][-1].content,
-        }
-    )
+    # prompt = f"I want to know the weather from {origin} to {destination}. How's the weather along th route?"
 
-    # route_info = get_driving_route([origin, 'Fort Wayne, Indiana, USA', destination], datetime.fromisoformat(departure_time_str))
-    # # # # [[-79.38171, 43.64877], [-85.12887, 41.113154], [-87.66063, 41.87897]]
-    # weather_data = get_weather_along_route(route_info['route'], datetime.fromisoformat(departure_time_str))
-    # print(weather_data)
-    # # Example weather data for testing
-    # weather_conditions = analyze_weather_conditions(weather_data)
-    # print(weather_conditions)
-    # departure_time = suggest_departure_time(route_info['route'], weather_data, datetime.fromisoformat(departure_time_str))
-    # print(departure_time)
+    # # Use the agent
+    # config = {"configurable": {"thread_id": "abc123"}}
+    # for step in agent_executor.stream(
+    #     {"messages": [HumanMessage(content=prompt)]},
+    #     config,
+    #     stream_mode="values",
+    # ):
+    #     step["messages"][-1].pretty_print()
+
+    route_info = get_driving_route.func([origin, 'Fort Wayne, Indiana, USA', destination], datetime.fromisoformat(departure_time_str))
+    add_legs_to_route(route_info['route'], datetime.fromisoformat(departure_time_str))
+    print(route_info['route']['legs'])
+    weather_data = get_weather_along_route.func(route_info['route'], datetime.fromisoformat(departure_time_str))
+    print(weather_data)
+    weather_conditions = analyze_weather_conditions.func(weather_data)
+    print(weather_conditions)
+    departure_time = suggest_departure_time.func(route_info['route'], weather_data, datetime.fromisoformat(departure_time_str))
+    print(departure_time)
 
