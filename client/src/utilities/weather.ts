@@ -7,7 +7,7 @@ const owmUrl = 'https://api.openweathermap.org/data/2.5/';
 
 export const openweathermapApiKey = '11fcb59c7eec3a76e6b54c1b93b590a7';
 export const tomorrowApiKey = 'iXVkLLrGwlwtH2vT3aU1gYsr8YmKRfHo';
-const ONE_HOUR = 3600;
+
 const THREE_HOURS = 10800;
 
 export async function getCurrentForecast(location: [number, number]) {
