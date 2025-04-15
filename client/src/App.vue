@@ -42,7 +42,9 @@ const handleTripPlan = async (formData: TripFormData) => {
       weatherData.value = data[0].stops.map((stop: WeatherStop) => ({
         position: stop.coordinates as [number, number],
         forecast: stop.weather.split(',')[0],
-        temperature: parseInt(stop.weather.split(',')[1])
+        temperature: parseInt(stop.weather.split(',')[1]),
+        location: stop.location,
+        arrivalTime: stop.arrival_time
       }));
     }
 

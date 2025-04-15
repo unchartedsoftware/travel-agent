@@ -45,7 +45,6 @@
   
     loading.value = true;
     weather.value = await getCurrentForecast(unchartedOffice);
-    console.log(await getFutureForecastAtTime(unchartedOffice, '2025-04-15T18:47:16+0000'))
     loading.value = false;
   }, { immediate: true });
   </script>

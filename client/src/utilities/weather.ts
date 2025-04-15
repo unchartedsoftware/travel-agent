@@ -18,7 +18,6 @@ export async function getCurrentForecast(location: [number, number]) {
 export async function getFutureForecastAtTime(location: [number, number], datetime: string) {
   const time = isoStringToTimestamp(datetime);
   const forecast = await weatherFetch(`${owmUrl}forecast?lat=${location[0]}&lon=${location[1]}&units=metric&appid=${openweathermapApiKey}`);
-  console.log(forecast);
   return forecast.list.find((li) => li.dt >= time && li.dt <= time + THREE_HOURS);
 }
 

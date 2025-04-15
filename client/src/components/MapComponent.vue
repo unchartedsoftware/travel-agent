@@ -16,6 +16,8 @@ const props = defineProps<{
     position: [number, number];
     forecast: string;
     temperature: number;
+    location: string;
+    arrivalTime: string;
   }> | null;
 }>();
 
@@ -47,23 +49,35 @@ const getWeatherIcon = (forecast: string): string => {
 
 // Function to get color class based on temperature
 const getTemperatureColorClass = (temp: number): string => {
-  if (temp <= 0) return 'weather-icon-cold';
-  if (temp >= 25) return 'weather-icon-hot';
+  if (temp <= 5) return 'weather-icon-cold';
+  if (temp >= 20) return 'weather-icon-hot';
   return 'weather-icon-moderate';
 };
 
 // Create custom icon for weather markers
-const createWeatherIcon = (forecast: string, temperature: number): L.DivIcon => {
+const createWeatherIcon = (
+  forecast: string,
+  temperature: number,
+  location: string,
+  arrivalTime: string
+): L.DivIcon => {
   const iconName = getWeatherIcon(forecast);
   const colorClass = getTemperatureColorClass(temperature);
+  const date = new Date(arrivalTime);
+  const formattedDate = date.toLocaleString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 
   return L.divIcon({
-    html: `<div class="weather-marker">
-             <i class="fas ${iconName} ${colorClass} text-2xl"></i>
-           </div>`,
+    html: `<div class="weather-marker ${colorClass}">
+            <div class="time">${formattedDate}</div>
+            <i class="fas ${iconName}" />
+            <div class="temp">${temperature}°C</div>
+          </div>`,
     className: 'weather-marker-container',
-    iconSize: [40, 40],
-    iconAnchor: [20, 20]  // Changed from [20, 40] to [20, 20] to center the icon
+    iconSize: [70, 70],
+    iconAnchor: [35, 35]
   });
 };
 
@@ -121,15 +135,23 @@ watch(() => props.weatherData, (newWeatherData) => {
     // Add new weather markers
     newWeatherData.forEach(data => {
       if (map) { // Add null check
+        
         const marker = L.marker(data.position, {
-          icon: createWeatherIcon(data.forecast, data.temperature)
+          icon: createWeatherIcon(data.forecast, data.temperature, data.location, data.arrivalTime),
         })
-          .bindPopup(`
-            <div class="weather-popup">
-              <p><b>Weather:</b> ${data.forecast}</p>
-              <p><b>Temperature:</b> ${data.temperature}°C</p>
-            </div>
-          `)
+          // .bindPopup(`
+          //   <div class="weather-popup">
+          //     <p><b>Location:</b> ${data.location}</p>
+          //     <p><b>ETA:</b> ${data.arrivalTime}</p>
+          //     <p><b>Weather:</b> ${data.forecast}</p>
+          //     <p><b>Temperature:</b> ${data.temperature}°C</p>
+          //   </div>
+          // `)
+          // .bindTooltip(`${data.forecast}, ${data.temperature}°C`, {
+          //   permanent: true, // Keeps the tooltip always visible
+          //   direction: 'top', // Positions the tooltip above the marker
+          //   className: 'weather-tooltip' // Custom class for styling
+          // })
           .addTo(map);
         weatherMarkers.push(marker);
       }
@@ -153,14 +175,26 @@ watch(() => props.weatherData, (newWeatherData) => {
 }
 
 .weather-marker {
-  display: flex;
+  /* display: flex;
   justify-content: center;
-  align-items: center;
-  width: 40px;
-  height: 40px;
+  align-items: center; */
+  width: 70px;
+  height: 70px;
   background-color: white;
   border-radius: 50%;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+
+  i {
+    width: 33px;
+    height: 33px;
+    font-size: medium;
+  }
+
+
+
+  .temp, .time {
+    margin-top: 7px;
+  }
 }
 
 .weather-popup {
@@ -168,8 +202,8 @@ watch(() => props.weatherData, (newWeatherData) => {
   line-height: 1.4;
 }
 
-.weather-icon-cold { color: #3b82f6; }   /* Blue */
-.weather-icon-moderate { color: #374151; }  /* Gray */
-.weather-icon-hot { color: #dc2626; }    /* Red */
+.weather-icon-cold { background-color: #85b4ff; }   /* Blue */
+.weather-icon-moderate { background-color: #eee; }  /* Gray */
+.weather-icon-hot { background-color: #f19f9f; }    /* Red */
 .text-2xl { font-size: 1.5rem; }
 </style>

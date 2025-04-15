@@ -93,6 +93,8 @@ button {
 }
 .w-full {
   width: 100%;
+  stroke:black;
+  color: black
 }
 .flex {
   display: flex;
