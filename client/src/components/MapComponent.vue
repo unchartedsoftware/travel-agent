@@ -32,23 +32,23 @@ onMounted(() => {
     }).addTo(map);
 	L.tileLayer(`https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${apiKey}`, {
 		attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
-		opacity: 0.6
+		opacity: 0.8
 	}).addTo(map);
-	L.tileLayer(`https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=${apiKey}`, {
-		attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
-		opacity: 0.6
-	}).addTo(map);
-	L.tileLayer(`https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=${apiKey}`, {
-		attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
-		opacity: 0.6
-	}).addTo(map);
+	// L.tileLayer(`https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=${apiKey}`, {
+	// 	attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+	// 	opacity: 0.6
+	// }).addTo(map);
+	// L.tileLayer(`https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=${apiKey}`, {
+	// 	attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+	// 	opacity: 0.6
+	// }).addTo(map);
 	L.tileLayer(`https://tile.openweathermap.org/map/snow/{z}/{x}/{y}.png?appid=${apiKey}`, {
 		attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
-		opacity: 0.6
+		opacity: 0.9
 	}).addTo(map);
 	L.tileLayer(`https://tile.openweathermap.org/map/rain_new/{z}/{x}/{y}.png?appid=${apiKey}`, {
 		attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
-		opacity: 0.6
+		opacity: 0.9
 	}).addTo(map);
   }
 });
