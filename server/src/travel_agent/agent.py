@@ -526,8 +526,8 @@ def passthrough_llm_function(origin: str, destination: str, departure_time: str)
 
 # Available tools for the agent to use
 tools = [
-    # get_weather_forecast,
-    # get_weather_forecast_for_next_5_days,
+    get_weather_forecast,
+    get_weather_forecast_for_next_5_days,
     generate_itinerary_with_llm,
 
     # get_driving_route, # it's common to encounter token limit issue with this function within the agent since the output is too long.
