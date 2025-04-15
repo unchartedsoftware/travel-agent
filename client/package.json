@@ -16,6 +16,7 @@
     "axios": "^1.8.4",
     "date-fns": "^4.1.0",
     "leaflet": "^1.9.4",
+    "marked": "^15.0.8",
     "primeflex": "^4.0.0",
     "primeicons": "^7.0.0",
     "primevue": "^3.53.1",

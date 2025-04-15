@@ -6,9 +6,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from langchain_core.messages import HumanMessage
 # from src.travel_agent import mock_agent as agent  # Use mock implementation
 from src.travel_agent import agent  # Use mock implementation
 import openrouteservice
+import json
 
 # Configure logging
 logging.basicConfig(
@@ -88,6 +90,9 @@ class RouteOption(BaseModel):
 class PlanTripResponse(BaseModel):
     response: Any  # Adjust fields based on the actual response structure
     ai_messages_content: Any
+    route_info: Any
+    weather_data: Any
+    optimal_departure_time: str
 
 @app.post("/api/trial", response_model=List[str])
 async def plan_trip(request: TripRequest):
@@ -114,11 +119,15 @@ async def plan_trip(request: TripRequest):
 
 @app.post("/api/plan-trip-agent", response_model=PlanTripResponse)
 async def ask_travel_agent(request: TripRequest):
-    prompt = f"I want a detailed itinerary for a trip from {request.start} to {request.end}, departing at {request.departure_time}. Please provide major stops along the way and weather conditions at each stop at the time of arrival. Include estimated travel time and any potential weather risks. Please make sure to avoid bad weather along the way"
+    prompt = f"I want a detailed itinerary for a trip from {request.start} to {request.end}, departing at {request.departure_time}. Please provide major stops along the way and weather conditions at each stop at the time of arrival. Include estimated travel time and any potential weather risks. Please provide best time to leave to avoid bad weather."
     # Use the agent
     # config = {"configurable": {"thread_id": "abc123"}}
     all_messages = []
     ai_messages_content = []
+    itinerary_tool_output_data = None
+    weather_data = None
+    route_info = None
+    optimal_departure_time = None
     agent_stream = agent.agent_executor.stream(
         {"messages": [HumanMessage(content=prompt)]},
         # config,
@@ -130,8 +139,21 @@ async def ask_travel_agent(request: TripRequest):
         all_messages.append(msg)
         if msg.type == "ai":
             ai_messages_content.append(msg.content)
+        if msg.type == "tool" and msg.name == "generate_itinerary_with_llm":
+            itinerary_tool_output_data = json.loads(msg.content)
+    if itinerary_tool_output_data: 
+        route_info = json.loads(itinerary_tool_output_data["route_info"])
+        route_info["route"]["geometry_decoded"] = openrouteservice.convert.decode_polyline(route_info["route"].get('geometry', ''))
+        weather_data = json.loads(itinerary_tool_output_data["weather_data"])
+        optimal_departure_time = itinerary_tool_output_data.get("optimal_departure_time")
 
-    return {"response": all_messages, "ai_messages_content": ai_messages_content}
+    return {
+        "response": all_messages,
+        "ai_messages_content": ai_messages_content,
+        "route_info": route_info,
+        "weather_data": weather_data,
+        "optimal_departure_time": optimal_departure_time
+    }
 
 @app.post("/api/plan-trip", response_model=List[RouteOption])
 async def plan_trip(request: TripRequest):

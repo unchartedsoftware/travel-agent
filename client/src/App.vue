@@ -5,41 +5,64 @@ import MapComponent from './components/MapComponent.vue'
 import RouteResults from './components/RouteResults.vue'
 import WeatherInfo from './components/WeatherInfo.vue'
 import ProgressSpinner from 'primevue/progressspinner'
+import AIMessages from './components/AIMessages.vue'
 import type { WeatherStop, TripFormData, RouteOption } from './models/types'
 
+const API_BASE_URL = 'http://localhost:8000';
+
 const weatherApiKey = ref('11fcb59c7eec3a76e6b54c1b93b590a7');
-const currentRoute = ref<[number, number][] | null>(null);
+const currentRoute = ref<[number, number][]>([]);
 const weatherData = ref<Array<{position: [number, number], forecast: string, temperature: number}> | null>(null);
 const routeOptions = ref<RouteOption[]>([]);
 const isLoading = ref(false);
+const aiMessages = ref<string[]>([]);
 
 const handleTripPlan = async (formData: TripFormData) => {
-  try {
-    isLoading.value = true;
-    const response = await fetch('http://localhost:8000/api/plan-trip', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        start: formData.start,
-        end: formData.end,
-        departure_time: formData.departureDate
-      })
-    });
+  isLoading.value = true;
+  aiMessages.value = [];
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch route options');
+  try {
+    // Make both API calls in parallel
+    const [routeResponse, aiResponse] = await Promise.all([
+      fetch(`${API_BASE_URL}/api/plan-trip`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          start: formData.start,
+          end: formData.end,
+          departure_time: formData.departure_time
+        })
+      }),
+      fetch(`${API_BASE_URL}/api/plan-trip-agent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          start: formData.start,
+          end: formData.end,
+          departure_time: formData.departure_time
+        })
+      })
+    ]);
+
+    if (!routeResponse.ok || !aiResponse.ok) {
+      throw new Error('Failed to fetch route options or AI suggestions');
     }
 
-    const data = await response.json();
+    const [routeData, aiData] = await Promise.all([
+      routeResponse.json(),
+      aiResponse.json()
+    ]);
 
     // Update route display with the first route option's coordinates
-    if (data[0]) {
-      currentRoute.value = data[0].coordinates;
+    if (routeData[0]) {
+      currentRoute.value = routeData[0].coordinates;
 
       // Transform weather data for display using the stop's actual coordinates
-      weatherData.value = data[0].stops.map((stop: WeatherStop) => ({
+      weatherData.value = routeData[0].stops.map((stop: WeatherStop) => ({
         position: stop.coordinates as [number, number],
         forecast: stop.weather.split(',')[0],
         temperature: parseInt(stop.weather.split(',')[1]),
@@ -48,7 +71,8 @@ const handleTripPlan = async (formData: TripFormData) => {
       }));
     }
 
-    routeOptions.value = data;
+    routeOptions.value = routeData;
+    aiMessages.value = aiData.ai_messages_content;
 
   } catch (error) {
     console.error('Error planning trip:', error);
@@ -84,6 +108,9 @@ const handleTripPlan = async (formData: TripFormData) => {
         <div class="col-12 p-2">
           <RouteResults :routes="routeOptions" />
         </div>
+        <div class="col-12 p-2">
+          <AIMessages :messages="aiMessages" />
+        </div>
       </div>
     </main>
   </div>
@@ -110,7 +137,7 @@ const handleTripPlan = async (formData: TripFormData) => {
 
 .header h1 {
   margin: 0;
-  font-size: 2rem;
+  font-size: 1.6rem; /* Reduced from 2rem */
 }
 
 .main-content {
@@ -157,7 +184,26 @@ const handleTripPlan = async (formData: TripFormData) => {
 
 .loading-text {
   color: var(--primary-color);
-  font-size: 1.2rem;
+  font-size: 0.96rem; /* Reduced from 1.2rem */
   font-weight: 500;
+}
+
+.results-container {
+  display: flex;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.map-container {
+  flex: 1;
+  min-width: 0;
+}
+
+.info-container {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 </style>

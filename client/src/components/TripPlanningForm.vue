@@ -26,7 +26,7 @@ const submitForm = () => {
   emit('planTrip', {
     start: startLocation.value,
     end: endLocation.value,
-    departureDate: earliestDepartureDate.value.toISOString()
+    departure_time: earliestDepartureDate.value.toISOString()
   });
 };
 </script>

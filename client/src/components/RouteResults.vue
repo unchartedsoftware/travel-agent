@@ -78,7 +78,7 @@ const getWeatherRiskSeverity = (risk: string) => {
 }
 .timeline-item h5 {
   margin: 0 0 0.5rem 0;
-  font-size: 1.1rem;
+  font-size: 0.88rem;
 }
 .timeline-item p {
   margin: 0.25rem 0;
@@ -123,7 +123,7 @@ const getWeatherRiskSeverity = (risk: string) => {
 
 @media (max-width: 768px) {
   .timeline-item h5 {
-    font-size: 1rem;
+    font-size: 0.8rem;
   }
 }
 </style>
