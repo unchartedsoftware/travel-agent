@@ -38,7 +38,7 @@ async def global_exception_handler(request, exc):
 class TripRequest(BaseModel):
     """
     Represents a trip planning request from the client.
-    
+
     Attributes:
         start: Starting location address or city name.
         end: Destination address or city name.
@@ -47,24 +47,26 @@ class TripRequest(BaseModel):
     start: str
     end: str
     departure_time: str
-    
+
 class WeatherStop(BaseModel):
     """
     Represents a stop along the route with associated weather information.
-    
+
     Attributes:
         location: Name or address of the location.
         arrival_time: Expected arrival time at this location (ISO format).
         weather: Weather description with temperature (e.g. "Partly cloudy, 15°C").
+        coordinates: Location coordinates as [latitude, longitude].
     """
     location: str
     arrival_time: str
     weather: str
-    
+    coordinates: List[float]
+
 class RouteOption(BaseModel):
     """
     Represents a complete route option with timing, weather risk assessment, and waypoints.
-    
+
     Attributes:
         id: Unique identifier for this route option.
         departure_time: Suggested departure time in ISO format.
@@ -94,7 +96,7 @@ async def plan_trip(request: TripRequest):
 
         # Generate full itinerary using LLM
         logger.debug("Generating itinerary")
-        itinerary = real_agent.passthrough_llm_function(
+        itinerary = agent.passthrough_llm_function(
             request.start,
             request.end,
             departure_time
@@ -110,11 +112,11 @@ async def plan_trip(request: TripRequest):
 async def plan_trip(request: TripRequest):
     try:
         logger.info(f"Processing trip request from {request.start} to {request.end}")
-        
+
         # Convert string to datetime
         departure_time = datetime.fromisoformat(request.departure_time)
         logger.debug(f"Parsed departure time: {departure_time}")
-        
+
         # Get route info from Google Maps
         logger.debug("Fetching route information")
         route_info = agent.get_driving_route.func([request.start, request.end], departure_time)
@@ -122,15 +124,15 @@ async def plan_trip(request: TripRequest):
         if not route_info:
             logger.warning("No route found")
             raise HTTPException(status_code=404, detail="Route not found")
-            
+
         # Get weather data along route
         logger.debug("Fetching weather data")
         weather_data = agent.get_weather_along_route.func(route_info['route'], departure_time)
-        
+
         # Get optimal departure time
         logger.debug("Calculating optimal departure time")
         optimal_time = agent.suggest_departure_time.func(route_info['route'], weather_data, departure_time)
-        
+
         # Generate full itinerary using LLM
         logger.debug("Generating itinerary")
         itinerary = agent.generate_itinerary_with_llm.func(
@@ -138,7 +140,7 @@ async def plan_trip(request: TripRequest):
             request.end,
             optimal_time.isoformat()
         )
-        
+
         # Extract route coordinates for visualization
         logger.debug("Extracting route coordinates")
         coordinates = []
@@ -149,14 +151,14 @@ async def plan_trip(request: TripRequest):
                 first_leg['start_location']['lat'],
                 first_leg['start_location']['lng']
             ])
-            
+
             # Add end location of each leg
             for leg in route_info['route']['legs']:
                 coordinates.append([
                     leg['end_location']['lat'],
                     leg['end_location']['lng']
                 ])
-        
+
         # Create route option with original departure time
         logger.debug("Creating route options")
         original_route = RouteOption(
@@ -168,21 +170,25 @@ async def plan_trip(request: TripRequest):
                 WeatherStop(
                     location=leg.get('start_address', ''),
                     arrival_time=leg['arrival_time'] if isinstance(leg['arrival_time'], str) else leg['arrival_time'].get('text', ''),
-                    weather=f"{weather['weather'][0]['description'].capitalize()}, {weather['main']['temp']}°C"
+                    weather=f"{weather['weather'][0]['description'].capitalize()}, {weather['main']['temp']}°C",
+                    coordinates=[
+                        leg['start_location']['lat'],
+                        leg['start_location']['lng']
+                    ]
                 )
                 for leg, weather in zip(route_info['route']['legs'], weather_data)
             ],
             score=85 if len(agent.analyze_weather_conditions.func(weather_data)) < 2 else 65,
             coordinates=coordinates
         )
-        
+
         # Create route option with optimal departure time
         optimal_route = None
         if optimal_time != departure_time:
             optimal_route_info = agent.get_driving_route.func([request.start, request.end], optimal_time)
             agent.add_legs_to_route(optimal_route_info['route'], optimal_time)
             optimal_weather = agent.get_weather_along_route.func(optimal_route_info['route'], optimal_time)
-            
+
             optimal_route = RouteOption(
                 id=2,
                 departure_time=optimal_time.isoformat(),
@@ -192,17 +198,21 @@ async def plan_trip(request: TripRequest):
                     WeatherStop(
                         location=leg.get('start_address', ''),
                         arrival_time=leg['arrival_time'] if isinstance(leg['arrival_time'], str) else leg['arrival_time'].get('text', ''),
-                        weather=f"{weather['weather'][0]['description'].capitalize()}, {weather['main']['temp']}°C"
+                        weather=f"{weather['weather'][0]['description'].capitalize()}, {weather['main']['temp']}°C",
+                        coordinates=[
+                            leg['start_location']['lat'],
+                            leg['start_location']['lng']
+                        ]
                     )
                     for leg, weather in zip(optimal_route_info['route']['legs'], optimal_weather)
                 ],
                 score=90,
                 coordinates=coordinates
             )
-        
+
         logger.info("Successfully processed trip request")
         return [original_route, optimal_route] if optimal_route else [original_route]
-        
+
     except Exception as e:
         logger.exception("Error processing trip request")
         raise HTTPException(status_code=500, detail=str(e))

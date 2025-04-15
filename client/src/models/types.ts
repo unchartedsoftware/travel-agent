@@ -5,11 +5,13 @@
  * @property {string} location - Name or address of the location
  * @property {string} arrival_time - Expected arrival time at this location (ISO format)
  * @property {string} weather - Weather description with temperature (e.g. "Partly cloudy, 15°C")
+ * @property {[number, number]} coordinates - Location coordinates as [latitude, longitude]
  */
 export interface WeatherStop {
   location: string;
   arrival_time: string;
   weather: string;
+  coordinates: [number, number];
 }
 
 /**
