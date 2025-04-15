@@ -4,15 +4,19 @@ version = "0.1.0"
 description = "AI-powered trip planning application with weather integration"
 requires-python = ">=3.12.0"
 dependencies = [
-    "googlemaps>=4.10.0",
-    "langchain>=0.3.23",
-    "langchain-community>=0.0.13",
-    "langchain-openai>=0.3.12",
-    "requests>=2.32.3",
-    "fastapi>=0.110.0",
-    "uvicorn>=0.27.0",
-    "pydantic>=2.6.0",
-    "python-dotenv>=1.0.0"
+    "googlemaps==4.10.0",
+    "langchain==0.3.23",
+    "langchain-community==0.3.21",
+    "langchain-openai==0.3.12",
+    "langgraph==0.3.29",
+    "requests==2.32.3",
+    "dotenv==0.9.9",
+    "openai==1.74.0",
+    "fastapi==0.110.0",
+    "uvicorn==0.27.0",
+    "pydantic==2.7.4",
+    "python-dotenv==1.0.0",
+    "openrouteservice==2.3.3"
 ]
 
 [build-system]
