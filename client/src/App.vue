@@ -7,10 +7,10 @@ import WeatherInfo from './components/WeatherInfo.vue'
 import ProgressSpinner from 'primevue/progressspinner'
 import AIMessages from './components/AIMessages.vue'
 import type { WeatherStop, TripFormData, RouteOption } from './models/types'
+import { openweathermapApiKey } from './utilities/weather'
 
 const API_BASE_URL = 'http://localhost:8000';
 
-const weatherApiKey = ref('11fcb59c7eec3a76e6b54c1b93b590a7');
 const currentRoute = ref<[number, number][]>([]);
 const weatherData = ref<Array<{position: [number, number], forecast: string, temperature: number}> | null>(null);
 const routeOptions = ref<RouteOption[]>([]);
@@ -96,7 +96,7 @@ const handleTripPlan = async (formData: TripFormData) => {
         </div>
         <div class="col-12 lg:col-8 p-2">
           <div class="relative">
-            <MapComponent :route="currentRoute" :weather-data="weatherData" :weatherApiKey="weatherApiKey" />
+            <MapComponent :route="currentRoute" :weather-data="weatherData" :weatherApiKey="openweathermapApiKey" />
             <div v-if="isLoading" class="loading-overlay">
               <ProgressSpinner />
               <div class="loading-text">Planning your trip...</div>
