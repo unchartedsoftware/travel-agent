@@ -1,5 +1,5 @@
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Tuple, Dict, Optional, Any
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
@@ -8,6 +8,7 @@ from langgraph.prebuilt.chat_agent_executor import AgentState
 from dotenv import load_dotenv  # Added import
 import json
 import os  # Added import
+import openrouteservice
 
 from typing import Literal
 
@@ -23,7 +24,7 @@ OPENROUTE_SERVICE_API_KEY = os.getenv("OPENROUTE_SERVICE_API_KEY")  # Updated li
 # Initialize LLM for LangChain
 model = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=OPENAI_API_KEY)  # Or any other LLM you prefer
 
-@tool
+# @tool
 def get_driving_route(stops: List[str], departure_time: datetime) -> Dict[str, Any]:
     """
     Gets driving directions and route information from OpenRoute Service API for multiple stops.
@@ -77,7 +78,7 @@ def get_driving_route(stops: List[str], departure_time: datetime) -> Dict[str, A
             print(f"Error parsing geocoding response for stop {stop}: {e}")
             return {}
     # Construct routing request
-    url = "https://api.openrouteservice.org/v2/directions/driving-car/geojson"
+    url = "https://api.openrouteservice.org/v2/directions/driving-car"
     headers = {
         "Accept": "application/json, application/geo+json, application/gpx+xml; charset=utf-8",
         "Authorization": OPENROUTE_SERVICE_API_KEY,
@@ -99,17 +100,17 @@ def get_driving_route(stops: List[str], departure_time: datetime) -> Dict[str, A
         print(f"Error parsing route data: {e}")
         return {}
 
-    if not route_data or not route_data.get('features'):
+    if not route_data or not route_data.get('routes'):
         print("No route found.")
         return {}
 
-    route = route_data['features'][0]
-    segments = route['properties'].get('segments', [])
+    route = route_data['routes'][0]
+    segments = route.get('segments', [])
     if not segments:
         print("No segments found in route.")
         return {}
-    duration = route['properties']['summary'].get('duration', 0) # seconds
-    distance = route['properties']['summary'].get('distance', 0) # meters
+    duration = route['summary'].get('duration', 0) # seconds
+    distance = route['summary'].get('distance', 0) # meters
     arrival_time = departure_time + timedelta(seconds=duration)
 
     route_summary = f"Drive from {stops[0]} to {stops[-1]} with stops at "
@@ -124,7 +125,7 @@ def get_driving_route(stops: List[str], departure_time: datetime) -> Dict[str, A
     }
 
 
-@tool
+# @tool
 def get_weather_forecast(latitude: float, longitude: float, time: datetime) -> Dict[str, Any]:
     """
     Fetches weather forecast data for a specific location and time from OpenWeatherMap API.
@@ -137,20 +138,24 @@ def get_weather_forecast(latitude: float, longitude: float, time: datetime) -> D
     Returns:
         The weather forecast data as a dictionary, or None on error.
     """
-    # Convert datetime to Unix timestamp (OpenWeatherMap uses Unix timestamps)
-    timestamp = int(time.timestamp())
+    # Make sure 'time' is timezone-aware (in UTC)
+    if time.tzinfo is None:
+        time = time.replace(tzinfo=timezone.utc)
+
     url = f"https://api.openweathermap.org/data/2.5/forecast?lat={latitude}&lon={longitude}&appid={OPENWEATHERMAP_API_KEY}&units=metric"  # Use metric units
     try:
         response = requests.get(url)
-        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+        response.raise_for_status()
         weather_data = response.json()
 
         # Find the forecast closest to the specified time
         closest_forecast = None
         min_time_diff = float('inf')
+
         for forecast in weather_data['list']:
-            forecast_time = datetime.utcfromtimestamp(forecast['dt'])  # Convert to UTC
+            forecast_time = datetime.fromtimestamp(forecast['dt'], tz=timezone.utc)
             time_diff = abs((forecast_time - time).total_seconds())
+
             if time_diff < min_time_diff:
                 min_time_diff = time_diff
                 closest_forecast = forecast
@@ -159,13 +164,13 @@ def get_weather_forecast(latitude: float, longitude: float, time: datetime) -> D
 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching weather data: {e}")
-        return None  # Explicitly return None in case of an error
+        return None
     except KeyError as e:
         print(f"Error parsing weather data: {e}")
         return None
 
 
-@tool
+# @tool
 def analyze_weather_conditions(weather_data: List[Dict[str, Any]]) -> List[str]:
     """
     Analyzes weather data for potential driving hazards.
@@ -184,7 +189,7 @@ def analyze_weather_conditions(weather_data: List[Dict[str, Any]]) -> List[str]:
         description = weather[0].get('description', '').lower()
         temperature = data.get('main', {}).get('temp', 0)
         wind_speed = data.get('wind', {}).get('speed', 0)
-        time = datetime.utcfromtimestamp(data['dt'])  # added line
+        time = datetime.fromtimestamp(data['dt'], tz=timezone.utc)  # added line
 
         if "snow" in description or "sleet" in description:
             hazards.append(f"Snow/Sleet at {time.strftime('%Y-%m-%d %H:%M')}")  # modified line
@@ -192,7 +197,9 @@ def analyze_weather_conditions(weather_data: List[Dict[str, Any]]) -> List[str]:
             hazards.append(f"Heavy Rain at {time.strftime('%Y-%m-%d %H:%M')}")  # modified line
         elif "fog" in description:
             hazards.append(f"Fog at {time.strftime('%Y-%m-%d %H:%M')}")  # modified line
-        elif temperature < 0:
+        # elif temperature < 0:
+        #     hazards.append(f"Freezing Temperatures ({temperature}°C) at {time.strftime('%Y-%m-%d %H:%M')}")  # modified line
+        elif temperature < 13: # For testing, consider 20°C as a threshold for freezing
             hazards.append(f"Freezing Temperatures ({temperature}°C) at {time.strftime('%Y-%m-%d %H:%M')}")  # modified line
         elif wind_speed > 15:  # Consider 15 m/s as a threshold for strong winds
             hazards.append(f"Strong Winds ({wind_speed} m/s) at {time.strftime('%Y-%m-%d %H:%M')}")  # modified line
@@ -200,7 +207,7 @@ def analyze_weather_conditions(weather_data: List[Dict[str, Any]]) -> List[str]:
     return hazards
 
 
-@tool
+# @tool
 def suggest_departure_time(route: Dict[str, Any], weather_data: List[Dict[str, Any]],
                           departure_time: datetime) -> datetime:
     """
@@ -246,12 +253,12 @@ def suggest_departure_time(route: Dict[str, Any], weather_data: List[Dict[str, A
             best_departure_time = alternative_departure_time
     return best_departure_time
 
-@tool
-def get_weather_along_route(route_data: Dict[str, Any], departure_time: datetime) -> List[Dict[str, Any]]:
+# @tool
+def get_weather_along_route(route: Dict[str, Any], departure_time: datetime) -> List[Dict[str, Any]]:
     """
-    Fetches weather forecast data along a driving route, handling multi-segment routes and structured GeoJSON feature.
+    Fetches weather forecast data along a driving route, handling multi-segment routes.
     Args:
-        route: The route data from OpenRoute Service API (a Geojson feature which is a directions result).
+        route: The route data from OpenRoute Service.
         departure_time: The intended departure time.
     Returns:
         A list of weather data dictionaries, with each dictionary containing
@@ -261,9 +268,8 @@ def get_weather_along_route(route_data: Dict[str, Any], departure_time: datetime
     weather_data = []
 
     try:
-        geometry = route_data.get('geometry', {})
-        properties = route_data.get('properties', {})
-        segments = properties.get('segments', [])
+        geometry = openrouteservice.convert.decode_polyline(route.get('geometry', ''))
+        segments = route.get('segments', [])
 
         coordinates = geometry.get('coordinates', [])
         if not coordinates:
@@ -376,7 +382,8 @@ agent_executor = create_react_agent(model, tools)
 if __name__ == "__main__":
     origin = "Toronto, Canada"
     destination = "Chicago, Illinois, USA"
-    departure_time_str = "2024-12-25T09:00:00"
+    # destination = "Hamilton, Ontario"
+    departure_time_str = "2025-04-14T09:00:00"
 
     prompt = f"I want a detailed itinerary for a trip from {origin} to {destination}, departing at {departure_time_str}.  What is the best time to leave to avoid bad weather?"
     messages = agent_executor.invoke({"messages": [("human", prompt)]})
@@ -388,6 +395,12 @@ if __name__ == "__main__":
     )
 
     # route_info = get_driving_route([origin, 'Fort Wayne, Indiana, USA', destination], datetime.fromisoformat(departure_time_str))
-    # # [[-79.38171, 43.64877], [-85.12887, 41.113154], [-87.66063, 41.87897]]
-    # result = get_weather_along_route(route_info['route'], datetime.fromisoformat(departure_time_str))
-    # print(result)
+    # # # # [[-79.38171, 43.64877], [-85.12887, 41.113154], [-87.66063, 41.87897]]
+    # weather_data = get_weather_along_route(route_info['route'], datetime.fromisoformat(departure_time_str))
+    # print(weather_data)
+    # # Example weather data for testing
+    # weather_conditions = analyze_weather_conditions(weather_data)
+    # print(weather_conditions)
+    # departure_time = suggest_departure_time(route_info['route'], weather_data, datetime.fromisoformat(departure_time_str))
+    # print(departure_time)
+
