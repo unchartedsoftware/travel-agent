@@ -24,6 +24,49 @@ let map: L.Map;
 let routeLine: L.Polyline | null = null;
 let weatherMarkers: L.Marker[] = [];
 
+// Function to determine weather icon based on forecast
+const getWeatherIcon = (forecast: string): string => {
+  const lowerForecast = forecast.toLowerCase();
+  if (lowerForecast.includes('snow') || lowerForecast.includes('sleet')) {
+    return 'fa-snowflake';
+  } else if (lowerForecast.includes('rain') || lowerForecast.includes('shower')) {
+    return 'fa-cloud-rain';
+  } else if (lowerForecast.includes('cloud')) {
+    return lowerForecast.includes('part') ? 'fa-cloud-sun' : 'fa-cloud';
+  } else if (lowerForecast.includes('clear') || lowerForecast.includes('sunny')) {
+    return 'fa-sun';
+  } else if (lowerForecast.includes('storm') || lowerForecast.includes('thunder')) {
+    return 'fa-cloud-bolt';
+  } else if (lowerForecast.includes('wind')) {
+    return 'fa-wind';
+  } else if (lowerForecast.includes('fog') || lowerForecast.includes('mist')) {
+    return 'fa-smog';
+  }
+  return 'fa-cloud'; // default icon
+};
+
+// Function to get color class based on temperature
+const getTemperatureColorClass = (temp: number): string => {
+  if (temp <= 0) return 'weather-icon-cold';
+  if (temp >= 25) return 'weather-icon-hot';
+  return 'weather-icon-moderate';
+};
+
+// Create custom icon for weather markers
+const createWeatherIcon = (forecast: string, temperature: number): L.DivIcon => {
+  const iconName = getWeatherIcon(forecast);
+  const colorClass = getTemperatureColorClass(temperature);
+
+  return L.divIcon({
+    html: `<div class="weather-marker">
+             <i class="fas ${iconName} ${colorClass} text-2xl"></i>
+           </div>`,
+    className: 'weather-marker-container',
+    iconSize: [40, 40],
+    iconAnchor: [20, 20]  // Changed from [20, 40] to [20, 20] to center the icon
+  });
+};
+
 onMounted(() => {
   if (mapContainer.value) {
     map = L.map(mapContainer.value).setView([39.8283, -98.5795], 4); // Center on USA
@@ -77,13 +120,19 @@ watch(() => props.weatherData, (newWeatherData) => {
 
     // Add new weather markers
     newWeatherData.forEach(data => {
-      const marker = L.marker(data.position)
-        .bindPopup(`
-          <b>Weather:</b> ${data.forecast}<br>
-          <b>Temperature:</b> ${data.temperature}°F
-        `)
-        .addTo(map);
-      weatherMarkers.push(marker);
+      if (map) { // Add null check
+        const marker = L.marker(data.position, {
+          icon: createWeatherIcon(data.forecast, data.temperature)
+        })
+          .bindPopup(`
+            <div class="weather-popup">
+              <p><b>Weather:</b> ${data.forecast}</p>
+              <p><b>Temperature:</b> ${data.temperature}°C</p>
+            </div>
+          `)
+          .addTo(map);
+        weatherMarkers.push(marker);
+      }
     });
   }
 });
@@ -94,8 +143,33 @@ watch(() => props.weatherData, (newWeatherData) => {
 </template>
 
 <style>
-.leaflet-popup-content {
+.weather-marker-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: none;
+  border: none;
+  transform: translate(-50%, -50%);  /* Added to help with centering */
+}
+
+.weather-marker {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 40px;
+  height: 40px;
+  background-color: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.weather-popup {
   font-size: 14px;
   line-height: 1.4;
 }
+
+.weather-icon-cold { color: #3b82f6; }   /* Blue */
+.weather-icon-moderate { color: #374151; }  /* Gray */
+.weather-icon-hot { color: #dc2626; }    /* Red */
+.text-2xl { font-size: 1.5rem; }
 </style>
