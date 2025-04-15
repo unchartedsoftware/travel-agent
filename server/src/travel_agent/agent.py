@@ -482,7 +482,8 @@ tools = [
 model = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=OPENAI_API_KEY, max_tokens=None)  # Or any other LLM you prefer
 
 memory = MemorySaver()
-agent_executor = create_react_agent(model, tools, checkpointer=memory)
+# agent_executor = create_react_agent(model, tools, checkpointer=memory)
+agent_executor = create_react_agent(model, tools)
 
 if __name__ == "__main__":
     origin = "Toronto, Canada"

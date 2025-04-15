@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Any
 import logging
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -85,6 +85,9 @@ class RouteOption(BaseModel):
     score: int
     coordinates: List[List[float]]
 
+class PlanTripResponse(BaseModel):
+    response: Any  # Adjust fields based on the actual response structure
+    ai_messages_content: Any
 
 @app.post("/api/trial", response_model=List[str])
 async def plan_trip(request: TripRequest):
@@ -108,6 +111,27 @@ async def plan_trip(request: TripRequest):
     except Exception as e:
         logger.exception("Error processing trip request")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/plan-trip-agent", response_model=PlanTripResponse)
+async def ask_travel_agent(request: TripRequest):
+    prompt = f"I want a detailed itinerary for a trip from {request.start} to {request.end}, departing at {request.departure_time}. Please provide major stops along the way and weather conditions at each stop at the time of arrival. Include estimated travel time and any potential weather risks. Please make sure to avoid bad weather along the way"
+    # Use the agent
+    # config = {"configurable": {"thread_id": "abc123"}}
+    all_messages = []
+    ai_messages_content = []
+    agent_stream = agent.agent_executor.stream(
+        {"messages": [HumanMessage(content=prompt)]},
+        # config,
+        stream_mode="values",
+    ) 
+    for step in agent_stream:
+        step["messages"][-1].pretty_print()
+        msg = step["messages"][-1]
+        all_messages.append(msg)
+        if msg.type == "ai":
+            ai_messages_content.append(msg.content)
+
+    return {"response": all_messages, "ai_messages_content": ai_messages_content}
 
 @app.post("/api/plan-trip", response_model=List[RouteOption])
 async def plan_trip(request: TripRequest):
