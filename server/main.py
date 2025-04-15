@@ -6,7 +6,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from src.travel_agent import mock_agent as agent  # Use mock implementation
+# from src.travel_agent import mock_agent as agent  # Use mock implementation
+from src.travel_agent import agent  # Use mock implementation
 
 # Configure logging
 logging.basicConfig(
@@ -92,22 +93,23 @@ async def plan_trip(request: TripRequest):
         
         # Get route info from Google Maps
         logger.debug("Fetching route information")
-        route_info = agent.get_driving_route(request.start, request.end, departure_time)
+        route_info = agent.get_driving_route.func([request.start, request.end], departure_time)
+        agent.add_legs_to_route(route_info['route'], departure_time)
         if not route_info:
             logger.warning("No route found")
             raise HTTPException(status_code=404, detail="Route not found")
             
         # Get weather data along route
         logger.debug("Fetching weather data")
-        weather_data = agent.get_weather_along_route(route_info['route'], departure_time)
+        weather_data = agent.get_weather_along_route.func(route_info['route'], departure_time)
         
         # Get optimal departure time
         logger.debug("Calculating optimal departure time")
-        optimal_time = agent.suggest_departure_time(route_info['route'], weather_data, departure_time)
+        optimal_time = agent.suggest_departure_time.func(route_info['route'], weather_data, departure_time)
         
         # Generate full itinerary using LLM
         logger.debug("Generating itinerary")
-        itinerary = agent.generate_itinerary_with_llm(
+        itinerary = agent.generate_itinerary_with_llm.func(
             request.start,
             request.end,
             optimal_time.isoformat()
@@ -137,7 +139,7 @@ async def plan_trip(request: TripRequest):
             id=1,
             departure_time=departure_time.isoformat(),
             estimated_duration=route_info['route']['legs'][0]['duration']['text'],
-            weather_risk="High" if len(agent.analyze_weather_conditions(weather_data)) > 2 else "Low",
+            weather_risk="High" if len(agent.analyze_weather_conditions.func(weather_data)) > 2 else "Low",
             stops=[
                 WeatherStop(
                     location=leg.get('start_address', ''),
@@ -146,15 +148,16 @@ async def plan_trip(request: TripRequest):
                 )
                 for leg, weather in zip(route_info['route']['legs'], weather_data)
             ],
-            score=85 if len(agent.analyze_weather_conditions(weather_data)) < 2 else 65,
+            score=85 if len(agent.analyze_weather_conditions.func(weather_data)) < 2 else 65,
             coordinates=coordinates
         )
         
         # Create route option with optimal departure time
         optimal_route = None
         if optimal_time != departure_time:
-            optimal_route_info = agent.get_driving_route(request.start, request.end, optimal_time)
-            optimal_weather = agent.get_weather_along_route(optimal_route_info['route'], optimal_time)
+            optimal_route_info = agent.get_driving_route.func([request.start, request.end], optimal_time)
+            agent.add_legs_to_route(optimal_route_info['route'], optimal_time)
+            optimal_weather = agent.get_weather_along_route.func(optimal_route_info['route'], optimal_time)
             
             optimal_route = RouteOption(
                 id=2,
