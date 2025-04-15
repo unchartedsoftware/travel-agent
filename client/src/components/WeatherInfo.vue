@@ -16,12 +16,11 @@
   
   <script setup lang="ts">
   import { ref, watch } from 'vue';
-  // import axios from 'axios';
-
+  import type { WeatherStop } from '../models/types';
   import { getCurrentForecast } from '../utilities/weather';
   
   const props = defineProps<{
-    location: [number, number];
+    weather: WeatherStop;
   }>();
   
   const weather = ref<{
@@ -40,7 +39,7 @@
   
   const loading = ref(false);
   
-  watch(() => props.location, async (newLoc) => {
+  watch(() => props.weather.coordinates[0], async (newLoc) => {
     if (!newLoc) return;
   
     loading.value = true;
