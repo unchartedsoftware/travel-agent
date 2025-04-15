@@ -6,7 +6,6 @@ import RouteResults from './components/RouteResults.vue'
 import WeatherInfo from './components/WeatherInfo.vue'
 import ProgressSpinner from 'primevue/progressspinner'
 import type { WeatherStop, TripFormData, RouteOption } from './models/types'
-import { getFutureForecastAtTime } from './utilities/weather.ts';
 
 const weatherApiKey = ref('11fcb59c7eec3a76e6b54c1b93b590a7');
 const currentRoute = ref<[number, number][] | null>(null);
@@ -39,16 +38,12 @@ const handleTripPlan = async (formData: TripFormData) => {
     if (data[0]) {
       currentRoute.value = data[0].coordinates;
 
-      // Transform weather data for display, matching each stop with the next coordinate
-      // (since weather data is for the destination of each leg)
-      weatherData.value = data[0].stops.map((stop: WeatherStop, index: number) => {
-        const position = data[0].coordinates[index + 1] as [number, number];       // Use next coordinate since weather is for destination
-        return {
-          position,
-          forecast: stop.weather.split(',')[0],
-          temperature: parseInt(stop.weather.split(',')[1])
-        }
-      });
+      // Transform weather data for display using the stop's actual coordinates
+      weatherData.value = data[0].stops.map((stop: WeatherStop) => ({
+        position: stop.coordinates as [number, number],
+        forecast: stop.weather.split(',')[0],
+        temperature: parseInt(stop.weather.split(',')[1])
+      }));
     }
 
     routeOptions.value = data;

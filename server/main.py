@@ -142,7 +142,7 @@ async def plan_trip(request: TripRequest):
         departure_time = datetime.fromisoformat(request.departure_time)
         logger.debug(f"Parsed departure time: {departure_time}")
 
-        # Get route info from Google Maps
+        # Get route info from OpenRoute Service
         logger.debug("Fetching route information")
         route_info = agent.get_driving_route.func([request.start, request.end], departure_time)
         agent.add_legs_to_route(route_info['route'], departure_time)
@@ -170,72 +170,81 @@ async def plan_trip(request: TripRequest):
 
         # Extract route coordinates for visualization
         logger.debug("Extracting route coordinates")
+        geometry = route_info['route'].get('geometry', {})
         coordinates = []
-        if route_info['route'].get('legs'):
-            # Add start location of first leg
-            first_leg = route_info['route']['legs'][0]
-            coordinates.append([
-                first_leg['start_location']['lat'],
-                first_leg['start_location']['lng']
-            ])
+        if geometry:
+            decoded = agent.openrouteservice.convert.decode_polyline(geometry)
+            coordinates = [[coord[1], coord[0]] for coord in decoded.get('coordinates', [])]
 
-            # Add end location of each leg
-            for leg in route_info['route']['legs']:
-                coordinates.append([
-                    leg['end_location']['lat'],
-                    leg['end_location']['lng']
-                ])
+        # Analyze weather hazards
+        hazards = agent.analyze_weather_conditions.func(weather_data)
+        
+        # Calculate weather risk based on hazard types and count
+        def calculate_weather_risk(hazards):
+            if not hazards:
+                return "Low"
+            severe_conditions = ["Snow/Sleet", "Heavy Rain", "Strong Winds"]
+            severe_count = sum(1 for h in hazards if any(c in h for c in severe_conditions))
+            if severe_count > 1:
+                return "High"
+            elif severe_count == 1 or len(hazards) > 2:
+                return "Medium"
+            return "Low"
+
+        # Create weather stops from the sampled weather points
+        def create_weather_stops(weather_data):
+            stops = []
+            for data in weather_data:
+                if not data or 'location' not in data:
+                    continue
+                lat = data['location']['latitude']
+                lon = data['location']['longitude']
+                stops.append(WeatherStop(
+                    location=f"Route point at {lat:.2f}, {lon:.2f}",
+                    arrival_time=data['time'],
+                    weather=f"{data['weather'][0]['description'].capitalize()}, {data['main']['temp']}°C",
+                    coordinates=[lat, lon]  # WeatherStop expects [latitude, longitude]
+                ))
+            return stops
 
         # Create route option with original departure time
         logger.debug("Creating route options")
+        weather_risk = calculate_weather_risk(hazards)
         original_route = RouteOption(
             id=1,
             departure_time=departure_time.isoformat(),
-            estimated_duration=route_info['route']['legs'][0]['duration']['text'],
-            weather_risk="High" if len(agent.analyze_weather_conditions.func(weather_data)) > 2 else "Low",
-            stops=[
-                WeatherStop(
-                    location=leg.get('start_address', ''),
-                    arrival_time=leg['arrival_time'] if isinstance(leg['arrival_time'], str) else leg['arrival_time'].get('text', ''),
-                    weather=f"{weather['weather'][0]['description'].capitalize()}, {weather['main']['temp']}°C",
-                    coordinates=[
-                        leg['start_location']['lat'],
-                        leg['start_location']['lng']
-                    ]
-                )
-                for leg, weather in zip(route_info['route']['legs'], weather_data)
-            ],
-            score=85 if len(agent.analyze_weather_conditions.func(weather_data)) < 2 else 65,
+            estimated_duration=str(route_info.get('total_duration', 0)),
+            weather_risk=weather_risk,
+            stops=create_weather_stops(weather_data),
+            score=85 if weather_risk == "Low" else (75 if weather_risk == "Medium" else 65),
             coordinates=coordinates
         )
 
-        # Create route option with optimal departure time
+        # Create route option with optimal departure time if different
         optimal_route = None
         if optimal_time != departure_time:
             optimal_route_info = agent.get_driving_route.func([request.start, request.end], optimal_time)
             agent.add_legs_to_route(optimal_route_info['route'], optimal_time)
             optimal_route_info["route"]["geometry_decoded"] = openrouteservice.convert.decode_polyline(optimal_route_info["route"].get('geometry', ''))
             optimal_weather = agent.get_weather_along_route.func(optimal_route_info['route'], optimal_time)
+            optimal_hazards = agent.analyze_weather_conditions.func(optimal_weather)
+            optimal_risk = calculate_weather_risk(optimal_hazards)
+
+            # Extract coordinates from optimal route
+            optimal_geometry = optimal_route_info['route'].get('geometry', {})
+            optimal_coordinates = []
+            if optimal_geometry:
+                decoded = agent.openrouteservice.convert.decode_polyline(optimal_geometry)
+                optimal_coordinates = [[coord[1], coord[0]] for coord in decoded.get('coordinates', [])]
 
             optimal_route = RouteOption(
                 id=2,
                 departure_time=optimal_time.isoformat(),
-                estimated_duration=optimal_route_info['route']['legs'][0]['duration']['text'],
-                weather_risk="Low",
-                stops=[
-                    WeatherStop(
-                        location=leg.get('start_address', ''),
-                        arrival_time=leg['arrival_time'] if isinstance(leg['arrival_time'], str) else leg['arrival_time'].get('text', ''),
-                        weather=f"{weather['weather'][0]['description'].capitalize()}, {weather['main']['temp']}°C",
-                        coordinates=[
-                            leg['start_location']['lat'],
-                            leg['start_location']['lng']
-                        ]
-                    )
-                    for leg, weather in zip(optimal_route_info['route']['legs'], optimal_weather)
-                ],
-                score=90,
-                coordinates=coordinates
+                estimated_duration=str(optimal_route_info.get('total_duration', 0)),
+                weather_risk=optimal_risk,
+                stops=create_weather_stops(optimal_weather),
+                score=90 if optimal_risk == "Low" else (80 if optimal_risk == "Medium" else 70),
+                coordinates=optimal_coordinates
             )
 
         logger.info("Successfully processed trip request")

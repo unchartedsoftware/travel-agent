@@ -13,6 +13,7 @@ from dotenv import load_dotenv  # Added import
 import json
 import os  # Added import
 import openrouteservice
+import math
 
 from typing import Literal
 
@@ -110,10 +111,10 @@ def get_driving_route(stops: List[str], departure_time: datetime) -> Dict[str, A
             print(f"Error parsing geocoding response for stop {stop}: {e}")
             return {}
     # Construct routing request
-    url = "https://api.openrouteservice.org/v2/directions/driving-car"
+    url = "https://api.openrouteservice.org/v2/directions/driving-car/json"
     headers = {
-        "Accept": "application/json, application/geo+json, application/gpx+xml; charset=utf-8",
-        "Authorization": OPENROUTE_SERVICE_API_KEY,
+        "Accept": "application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8",
+        "Authorization": "5b3ce3597851110001cf624844e6651e687a47c891d67364876ea355",
         "Content-Type": "application/json; charset=utf-8",
     }
     body = {
@@ -173,7 +174,7 @@ def get_weather_forecast(latitude: float, longitude: float, time: datetime) -> D
     if time.tzinfo is None:
         time = time.replace(tzinfo=timezone.utc)
     try:
-        weather_data = get_weather_forecast_for_next_5_days.func(latitude, longitude) 
+        weather_data = get_weather_forecast_for_next_5_days.func(latitude, longitude)
         # Find the forecast closest to the specified time
         closest_forecast = None
         min_time_diff = float('inf')
@@ -199,7 +200,7 @@ def get_weather_forecast(latitude: float, longitude: float, time: datetime) -> D
 def get_weather_forecast_for_next_5_days(latitude: float, longitude: float) -> Dict[str, Any]:
     """
     Fetches weather forecast data for next 5 days from current time from OpenWeatherMap API.
-    Return the forecast for the next 5 days starting from the given time. 
+    Return the forecast for the next 5 days starting from the given time.
 
     Args:
         latitude: The latitude of the location.
@@ -326,8 +327,8 @@ def get_weather_along_route(route: Dict[str, Any], departure_time: datetime) -> 
         geometry = openrouteservice.convert.decode_polyline(route.get('geometry', ''))
         segments = route.get('segments', [])
 
-        coordinates = geometry.get('coordinates', [])
-        if not coordinates:
+        coordinates = geometry.get('coordinates', [])  # OpenRouteService returns [longitude, latitude]
+        if not coordinates or len(coordinates) < 2:  # Need at least start and end points
             print("No coordinates found in geometry.")
             return []
 
@@ -336,25 +337,80 @@ def get_weather_along_route(route: Dict[str, Any], departure_time: datetime) -> 
             print("No route duration found.")
             return []
 
-        num_points = 5  # Number of points to sample along the route
-        time_increment = total_duration / (num_points + 1)
-        current_time = departure_time
+        # Calculate total route distance (in meters)
+        total_distance = 0
+        distances = []
+        for i in range(1, len(coordinates)):
+            lon1, lat1 = coordinates[i-1]  # OpenRouteService coordinates are [longitude, latitude]
+            lon2, lat2 = coordinates[i]
+            # Use Haversine formula to calculate distance between points
+            R = 6371000  # Earth radius in meters
+            phi1 = math.radians(lat1)
+            phi2 = math.radians(lat2)
+            delta_phi = math.radians(lat2 - lat1)
+            delta_lambda = math.radians(lon2 - lon1)
+            
+            a = math.sin(delta_phi/2) * math.sin(delta_phi/2) + \
+                math.cos(phi1) * math.cos(phi2) * \
+                math.sin(delta_lambda/2) * math.sin(delta_lambda/2)
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+            distance = R * c
+            
+            total_distance += distance
+            distances.append(total_distance)
 
-        for i in range(1, num_points + 1):
-            point_time = current_time + timedelta(seconds=time_increment * i)
+        # Sample 5 points at equal distance intervals (excluding start and end points)
+        num_points = 5
+        interval_distance = total_distance / (num_points + 1)
+        target_distances = [interval_distance * i for i in range(1, num_points + 1)]
+        
+        # For each target distance, find the closest actual point
+        sampled_points = []
+        for target in target_distances:
+            # Find the first point that exceeds the target distance
+            idx = next((i for i, d in enumerate(distances) if d >= target), len(distances) - 1)
+            if idx > 0:
+                # Interpolate between points if needed
+                d1, d2 = distances[idx-1], distances[idx]
+                if d2 - d1 > 0:  # Avoid division by zero
+                    ratio = (target - d1) / (d2 - d1)
+                    lon1, lat1 = coordinates[idx-1]  # OpenRouteService coordinates are [longitude, latitude]
+                    lon2, lat2 = coordinates[idx]
+                    lat = lat1 + ratio * (lat2 - lat1)
+                    lon = lon1 + ratio * (lon2 - lon1)
+                    sampled_points.append((lon, lat))  # Keep same order as OpenRouteService
+                else:
+                    sampled_points.append(coordinates[idx])
+            else:
+                sampled_points.append(coordinates[idx])
 
-            # Estimate point index
-            point_index = int(len(coordinates) * i / (num_points + 1))
-            point_index = min(point_index, len(coordinates) - 1)
+        # Add endpoints to our sampling points
+        start_point = coordinates[0]
+        end_point = coordinates[-1]
+        all_points = [start_point] + sampled_points + [end_point]
 
-            lng, lat = coordinates[point_index]
-            weather = get_weather_forecast.func(lat, lng, point_time)
+        # Calculate arrival times proportionally based on distance
+        for i, point in enumerate(all_points):
+            # For start point, use departure time
+            # For other points, calculate proportional time based on position
+            if i == 0:
+                point_time = departure_time
+            else:
+                # For end point, use total duration, otherwise calculate proportionally
+                if i == len(all_points) - 1:
+                    point_time = departure_time + timedelta(seconds=total_duration)
+                else:
+                    point_time = departure_time + timedelta(seconds=(total_duration * i/(len(all_points) - 1)))
+            
+            lon, lat = point  # Unpack as longitude, latitude
+            weather = get_weather_forecast.func(lat, lon, point_time)  # Weather API expects latitude first
             if weather:
-                weather['location'] = {'latitude': lat, 'longitude': lng}
+                weather['location'] = {'latitude': lat, 'longitude': lon}  # Store in consistent order
                 weather['time'] = point_time.isoformat()
                 weather_data.append(weather)
             else:
-                print(f"Failed to get weather for location: {lat}, {lng} at {point_time}")
+                print(f"Failed to get weather for location: lat={lat}, lon={lon} at {point_time}")
+
     except Exception as e:
         print(f"Error while processing route: {e}")
 
@@ -402,7 +458,7 @@ def generate_itinerary_with_llm(origin: str, destination: str, departure_time_st
             )
     else:
         weather_summary = "There is no weather data available for this route."
-    
+
     # Use LLM to generate a more natural-language itinerary
     prompt = ChatPromptTemplate.from_messages([
         ("system", "You are a helpful travel assistant that provides detailed and friendly travel itineraries, including weather information and recommendations for optimal departure times."),
