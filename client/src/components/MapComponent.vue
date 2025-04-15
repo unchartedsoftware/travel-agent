@@ -20,7 +20,7 @@ const props = defineProps<{
 }>();
 
 const mapContainer = ref<HTMLElement | null>(null);
-let map: L.Map | null = null;
+let map: L.Map;
 let routeLine: L.Polyline | null = null;
 let weatherMarkers: L.Marker[] = [];
 
