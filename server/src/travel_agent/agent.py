@@ -408,6 +408,39 @@ def generate_itinerary_with_llm(origin: str, destination: str, departure_time_st
 
     return itinerary_response
 
+def passthrough_llm_function(origin: str, destination: str, departure_time: str) -> str:
+    """
+    A passthrough function for the LLM. This is a placeholder and can be replaced with actual LLM calls.
+    """
+    # Use LLM to generate a more natural-language itinerary
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "You are a helpful travel assistant that provides detailed and friendly travel itineraries, including weather information and recommendations for optimal departure times"),
+        ("user", """I am planning a trip from {origin} to {destination}, departing at {departure_time}. Please provide a detailed itinerary. When creating this itinerary take the following into account:
+         - Choose optimal routes based on weather. Prefer routes that avoid inclement weather or adjust the driving schedule to minimize impact. Your life will be in danger if I drive in bad weather.
+         - No day should ever have more than 9h of driving time or else your life will be in danger due to fatigue.
+         - You are driving a car with an internal combustion engine that has a range of about 450km before requiring gas. Ideally you should fill up every 400km. I will only stop for gas if you tell me to, and if I run out of gas your life will be in peril. Give specific locations or store names to get gas.
+         - Driving time should be ideally 8h or less per day.
+         - There should be a break around 4 hours of driving, and never more than 5 hours of consecutive driving without a break. Breaks occurring between 11am and 2pm should be at least 1 hour long and include a specific restaurant in the area.
+         - Choose optimal driving times and times for breaks around historic traffic data, with no day starting before 6am and finished by 8pm
+         - If the trip is a multi day trip, the final stop of the day should be in a city or near a notable attraction.
+         - Suggest budget friendly accommodations at the final rest point of the day. Give specific examples of hotels or motels.
+         - Include the forecasted weather at each end point.
+         - Include the forecasted weather at each break point and gas station visit.
+        """),
+    ])
+    chain = prompt | ChatOpenAI() | StrOutputParser()
+
+    # Create the input for the LLM.
+    inputs = {
+        "origin": origin,
+        "destination": destination,
+        "departure_time": departure_time.strftime('%Y-%m-%d %H:%M:%S'),
+    }
+
+    # Generate the itinerary using the LLM
+    itinerary_response = chain.invoke(inputs)
+    return itinerary_response
+
 tools = [
     # get_driving_route,
     get_weather_forecast,
@@ -415,6 +448,7 @@ tools = [
     # analyze_weather_conditions,
     # suggest_departure_time,
     generate_itinerary_with_llm,
+    passthrough_llm_function,
 ]
 
 memory = MemorySaver()

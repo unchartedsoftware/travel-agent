@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from src.travel_agent import mock_agent as agent  # Use mock implementation
+from src.travel_agent import agent as real_agent  # Use real implementation
 
 # Configure logging
 logging.basicConfig(
@@ -80,6 +81,30 @@ class RouteOption(BaseModel):
     stops: List[WeatherStop]
     score: int
     coordinates: List[List[float]]
+
+
+@app.post("/api/trial", response_model=List[str])
+async def plan_trip(request: TripRequest):
+    try:
+        logger.info(f"Processing trip request from {request.start} to {request.end}")
+
+        # Convert string to datetime
+        departure_time = datetime.fromisoformat(request.departure_time)
+        logger.debug(f"Parsed departure time: {departure_time}")
+
+        # Generate full itinerary using LLM
+        logger.debug("Generating itinerary")
+        itinerary = real_agent.passthrough_llm_function(
+            request.start,
+            request.end,
+            departure_time
+        )
+
+        return itinerary.split('\n')
+
+    except Exception as e:
+        logger.exception("Error processing trip request")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/plan-trip", response_model=List[RouteOption])
 async def plan_trip(request: TripRequest):
