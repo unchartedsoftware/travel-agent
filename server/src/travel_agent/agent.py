@@ -430,6 +430,7 @@ def generate_itinerary_with_llm(origin: str, destination: str, departure_time_st
 
     return itinerary_response
 
+@tool
 def passthrough_llm_function(origin: str, destination: str, departure_time: str) -> str:
     """
     A passthrough function for the LLM. This is a placeholder and can be replaced with actual LLM calls.
@@ -471,12 +472,13 @@ tools = [
 
     # get_driving_route, # it's common to encounter token limit issue with this function within the agent since the output is too long.
 
+    #passthrough_llm_function
+
     # Note: It seems the agent is having hard time figuring out how to use and pass the complex data structures as input arguments to following functions.
     # These functions are not usable in the agent yet.
     # get_weather_along_route,
     # analyze_weather_conditions,
     # suggest_departure_time,
-    # passthrough_llm_function,
 ]
 
 memory = MemorySaver()
