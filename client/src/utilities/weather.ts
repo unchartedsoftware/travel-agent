@@ -7,28 +7,22 @@ const owmUrl = 'https://api.openweathermap.org/data/2.5/';
 
 export const openweathermapApiKey = '11fcb59c7eec3a76e6b54c1b93b590a7';
 export const tomorrowApiKey = 'iXVkLLrGwlwtH2vT3aU1gYsr8YmKRfHo';
-
-const THREE_HOURS = 10800000;
+const ONE_HOUR = 3600;
+const THREE_HOURS = 10800;
 
 export async function getCurrentForecast(location: [number, number]) {
-  const weather = await weatherFetch(location, `https://api.openweathermap.org/data/2.5/weather?lat=${location[0]}&lon=${location[1]}&units=metric&appid=${openweathermapApiKey}`);
+  const weather = await weatherFetch(`https://api.openweathermap.org/data/2.5/weather?lat=${location[0]}&lon=${location[1]}&units=metric&appid=${openweathermapApiKey}`);
   return weather
 }
 
-export async function getHistoricalWeather(location: [number, number], datetime: string) {
-  const time = isoStringToTimestamp(datetime);
-  const data = await weatherFetch(location, `${owmUrl}history/city?lat=${location[0]}&lon=${location[1]}&appid=${openweathermapApiKey}&start=${time}&end=${time+THREE_HOURS}`);
-  console.log(data);
-  return data;
-}
-
 export async function getFutureForecastAtTime(location: [number, number], datetime: string) {
-  const forecast = await weatherFetch(location, `${owmUrl}forecast?lat=${location[0]}&lon=${location[1]}&units=metric&appid=${openweathermapApiKey}`);
+  const time = isoStringToTimestamp(datetime);
+  const forecast = await weatherFetch(`${owmUrl}forecast?lat=${location[0]}&lon=${location[1]}&units=metric&appid=${openweathermapApiKey}`);
   console.log(forecast);
-  return forecast;
+  return forecast.list.find((li) => li.dt >= time && li.dt <= time + THREE_HOURS);
 }
 
-async function weatherFetch(location: [number, number], url: string) {
+async function weatherFetch(url: string) {
     try {
         const response = await axios.get(url);
         return response.data;
@@ -39,5 +33,5 @@ async function weatherFetch(location: [number, number], url: string) {
 
 function isoStringToTimestamp(datetime: string) {
   const date = new Date(datetime);
-  return date.getTime();
+  return Math.floor(date.getTime() / 1000);
 }
