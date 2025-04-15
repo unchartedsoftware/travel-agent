@@ -123,7 +123,6 @@ async def plan_trip(request: TripRequest):
         route_info = agent.get_driving_route.func([request.start, request.end], departure_time)
         agent.add_legs_to_route(route_info['route'], departure_time)
         route_info["route"]["geometry"] = openrouteservice.convert.decode_polyline(route_info["route"].get('geometry', ''))
-        print(route_info["route"]["geometry"])
         
         if not route_info:
             logger.warning("No route found")
