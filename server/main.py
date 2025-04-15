@@ -119,7 +119,7 @@ async def plan_trip(request: TripRequest):
 
 @app.post("/api/plan-trip-agent", response_model=PlanTripResponse)
 async def ask_travel_agent(request: TripRequest):
-    prompt = f"I want a detailed itinerary for a trip from {request.start} to {request.end}, departing at {request.departure_time}. Please provide major stops along the way and weather conditions at each stop at the time of arrival. Include estimated travel time and any potential weather risks. Please make sure to avoid bad weather along the way"
+    prompt = f"I want a detailed itinerary for a trip from {request.start} to {request.end}, departing at {request.departure_time}. Please provide major stops along the way and weather conditions at each stop at the time of arrival. Include estimated travel time and any potential weather risks. Please provide best time to leave to avoid bad weather."
     # Use the agent
     # config = {"configurable": {"thread_id": "abc123"}}
     all_messages = []

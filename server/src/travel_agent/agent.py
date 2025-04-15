@@ -462,7 +462,7 @@ def generate_itinerary_with_llm(origin: str, destination: str, departure_time_st
     # Use LLM to generate a more natural-language itinerary
     prompt = ChatPromptTemplate.from_messages([
         ("system", "You are a helpful travel assistant that provides detailed and friendly travel itineraries, including weather information and recommendations for optimal departure times."),
-        ("user", "I am planning a trip from {origin} to {destination}, departing at {departure_time}. Please provide a detailed itinerary, including information about the weather conditions along the route and the best time to depart to avoid bad weather. Consider route_info: {route_info}, weather_conditions: {weather_conditions}, and optimal_departure_time: {optimal_departure_time}. At the end of the response, append entire route_info in JSON format."),
+        ("user", "I am planning a trip from {origin} to {destination}, departing at {departure_time}. Please provide a detailed itinerary, including information about the weather conditions along the route and the best time to depart to avoid bad weather. Consider route_info: {route_info}, weather_conditions: {weather_conditions}, and optimal_departure_time: {optimal_departure_time}."),
     ])
 
     chain = prompt | ChatOpenAI() | StrOutputParser()
