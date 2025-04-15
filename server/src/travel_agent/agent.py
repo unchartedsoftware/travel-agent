@@ -25,9 +25,6 @@ OPENWEATHERMAP_API_KEY = os.getenv("OPENWEATHERMAP_API_KEY")  # Updated line
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # Updated line
 OPENROUTE_SERVICE_API_KEY = os.getenv("OPENROUTE_SERVICE_API_KEY")  # Updated line
 
-# Initialize LLM for LangChain
-model = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=OPENAI_API_KEY)  # Or any other LLM you prefer
-
 # Add legs to the route for backward compatibility with existing frontend code
 def add_legs_to_route(route: Dict[str, Any], departure_time: datetime):
     geometry = openrouteservice.convert.decode_polyline(route.get('geometry', ''))
@@ -481,6 +478,9 @@ tools = [
     # suggest_departure_time,
 ]
 
+# Initialize LLM for LangChain
+model = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=OPENAI_API_KEY, max_tokens=None)  # Or any other LLM you prefer
+
 memory = MemorySaver()
 agent_executor = create_react_agent(model, tools, checkpointer=memory)
 
@@ -490,7 +490,7 @@ if __name__ == "__main__":
     # destination = "Hamilton, Ontario"
     departure_time_str = "2025-04-16T09:00:00"
 
-    prompt = f"I want a detailed itinerary for a trip from {origin} to {destination}, departing at {departure_time_str}.  What is the best time to leave to avoid bad weather?"
+    prompt = f"I want a detailed itinerary for a trip from {origin} to {destination}, departing at {departure_time_str}.  What is the best time to leave to avoid bad weather? Please provide major stops along the way and weather conditions at each stop for future dates."
     # prompt = f"I want to know the weather from {origin} to {destination}. How's the weather along th route in next few days?"
 
     # Use the agent
