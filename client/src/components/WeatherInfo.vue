@@ -16,11 +16,11 @@
   
   <script setup lang="ts">
   import { ref, watch } from 'vue';
-  import type { WeatherStop } from '../models/types';
-  import { getCurrentForecast } from '../utilities/weather';
+  // import type { WeatherStop } from '../models/types';
+  import { getCurrentForecast, getFutureForecastAtTime } from '../utilities/weather';
   
   const props = defineProps<{
-    weather: WeatherStop;
+    weather: any;
   }>();
   
   const weather = ref<{
@@ -38,12 +38,14 @@
   } | null>(null);
   
   const loading = ref(false);
+  const unchartedOffice: [number, number] = [43.65035550554264, -79.36450868771557];
   
-  watch(() => props.weather.coordinates[0], async (newLoc) => {
+  watch(() => props.weather, async (newLoc) => {
     if (!newLoc) return;
   
     loading.value = true;
-    weather.value = await getCurrentForecast(newLoc);
+    weather.value = await getCurrentForecast(unchartedOffice);
+    console.log(await getFutureForecastAtTime(unchartedOffice, '2025-04-15T18:47:16+0000'))
     loading.value = false;
   }, { immediate: true });
   </script>

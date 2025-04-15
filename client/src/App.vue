@@ -66,7 +66,7 @@ const handleTripPlan = async (formData: TripFormData) => {
       <div class="grid w-full m-0">
         <div class="col-12 lg:col-4 p-2">
           <TripPlanningForm @plan-trip="handleTripPlan" />
-          <WeatherInfo v-if="currentRoute && currentRoute.length > 0" :location="currentRoute[0]" />
+          <WeatherInfo v-if="weatherData && weatherData.length > 0" :weather="weatherData[0]" />
         </div>
         <div class="col-12 lg:col-8 p-2">
           <MapComponent :route="currentRoute" :weather-data="weatherData" :weatherApiKey="weatherApiKey" />
