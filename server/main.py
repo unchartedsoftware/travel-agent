@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from travel_agent import mock_agent as agent  # Use mock implementation
+from src.travel_agent import mock_agent as agent  # Use mock implementation
 
 # Configure logging
 logging.basicConfig(
