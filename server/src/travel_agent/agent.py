@@ -173,16 +173,10 @@ def get_weather_forecast(latitude: float, longitude: float, time: datetime) -> D
     Returns:
         The weather forecast data as a dictionary, or None on error.
     """
-    # Make sure 'time' is timezone-aware (in UTC)
     if time.tzinfo is None:
         time = time.replace(tzinfo=timezone.utc)
-
-    url = f"https://api.openweathermap.org/data/2.5/forecast?lat={latitude}&lon={longitude}&appid={OPENWEATHERMAP_API_KEY}&units=metric"  # Use metric units
     try:
-        response = requests.get(url)
-        response.raise_for_status()
-        weather_data = response.json()
-
+        weather_data = get_weather_forecast_for_next_5_days.func(latitude, longitude) 
         # Find the forecast closest to the specified time
         closest_forecast = None
         min_time_diff = float('inf')
@@ -196,6 +190,34 @@ def get_weather_forecast(latitude: float, longitude: float, time: datetime) -> D
                 closest_forecast = forecast
 
         return closest_forecast if closest_forecast else {}
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching weather data: {e}")
+        return None
+    except KeyError as e:
+        print(f"Error parsing weather data: {e}")
+        return None
+
+@tool
+def get_weather_forecast_for_next_5_days(latitude: float, longitude: float) -> Dict[str, Any]:
+    """
+    Fetches weather forecast data for next 5 days from current time from OpenWeatherMap API.
+    Return the forecast for the next 5 days starting from the given time. 
+
+    Args:
+        latitude: The latitude of the location.
+        longitude: The longitude of the location.
+        time: The starting time for which the forecast is needed (datetime object).
+
+    Returns:
+        The weather forecast data as a dictionary, or None on error.
+    """
+    url = f"https://api.openweathermap.org/data/2.5/forecast?lat={latitude}&lon={longitude}&appid={OPENWEATHERMAP_API_KEY}&units=metric"  # Use metric units
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        weather_data = response.json()
+        return weather_data
 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching weather data: {e}")
@@ -445,6 +467,7 @@ def passthrough_llm_function(origin: str, destination: str, departure_time: str)
 tools = [
     # get_driving_route,
     get_weather_forecast,
+    get_weather_forecast_for_next_5_days,
     # get_weather_along_route,
     # analyze_weather_conditions,
     # suggest_departure_time,
@@ -459,10 +482,10 @@ if __name__ == "__main__":
     origin = "Toronto, Canada"
     destination = "Chicago, Illinois, USA"
     # destination = "Hamilton, Ontario"
-    departure_time_str = "2025-04-14T09:00:00"
+    departure_time_str = "2025-04-16T09:00:00"
 
     prompt = f"I want a detailed itinerary for a trip from {origin} to {destination}, departing at {departure_time_str}.  What is the best time to leave to avoid bad weather?"
-    # prompt = f"I want to know the weather from {origin} to {destination}. How's the weather along th route?"
+    # prompt = f"I want to know the weather from {origin} to {destination}. How's the weather along th route in next few days?"
 
     # Use the agent
     config = {"configurable": {"thread_id": "abc123"}}
