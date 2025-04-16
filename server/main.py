@@ -132,7 +132,7 @@ async def ask_travel_agent(request: TripRequest):
         {"messages": [HumanMessage(content=prompt)]},
         # config,
         stream_mode="values",
-    ) 
+    )
     for step in agent_stream:
         step["messages"][-1].pretty_print()
         msg = step["messages"][-1]
@@ -141,7 +141,7 @@ async def ask_travel_agent(request: TripRequest):
             ai_messages_content.append(msg.content)
         if msg.type == "tool" and msg.name == "generate_itinerary_with_llm":
             itinerary_tool_output_data = json.loads(msg.content)
-    if itinerary_tool_output_data: 
+    if itinerary_tool_output_data:
         route_info = json.loads(itinerary_tool_output_data["route_info"])
         route_info["route"]["geometry_decoded"] = openrouteservice.convert.decode_polyline(route_info["route"].get('geometry', ''))
         weather_data = json.loads(itinerary_tool_output_data["weather_data"])
@@ -169,7 +169,7 @@ async def plan_trip(request: TripRequest):
         route_info = agent.get_driving_route.func([request.start, request.end], departure_time)
         agent.add_legs_to_route(route_info['route'], departure_time)
         route_info["route"]["geometry_decoded"] = openrouteservice.convert.decode_polyline(route_info["route"].get('geometry', ''))
-        
+
         if not route_info:
             logger.warning("No route found")
             raise HTTPException(status_code=404, detail="Route not found")
@@ -200,7 +200,7 @@ async def plan_trip(request: TripRequest):
 
         # Analyze weather hazards
         hazards = agent.analyze_weather_conditions.func(weather_data)
-        
+
         # Calculate weather risk based on hazard types and count
         def calculate_weather_risk(hazards):
             if not hazards:
@@ -222,7 +222,7 @@ async def plan_trip(request: TripRequest):
                 lat = data['location']['latitude']
                 lon = data['location']['longitude']
                 stops.append(WeatherStop(
-                    location=f"Route point at {lat:.2f}, {lon:.2f}",
+                    location=data['location'].get('name', 'Unknown'),
                     arrival_time=data['time'],
                     weather=f"{data['weather'][0]['description'].capitalize()}, {data['main']['temp']}°C",
                     coordinates=[lat, lon]  # WeatherStop expects [latitude, longitude]
