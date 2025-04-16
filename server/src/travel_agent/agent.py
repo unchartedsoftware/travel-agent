@@ -16,6 +16,7 @@ import openrouteservice
 import math
 
 from typing import Literal
+from functools import lru_cache
 
 
 # Load environment variables from .env file
@@ -308,6 +309,35 @@ def suggest_departure_time(route: Dict[str, Any], weather_data: List[Dict[str, A
             best_departure_time = alternative_departure_time
     return best_departure_time
 
+@lru_cache(maxsize=1000)
+def reverse_geocode(lat: float, lon: float) -> str:
+    """Get place name from coordinates using geoservices.geotime.com reverse geocoding.
+    Results are cached using LRU cache with a maximum size of 1000 entries."""
+    geocode_url = f"https://geoservices.geotime.com/geocode/reverse?lat={lat}&lon={lon}"
+    try:
+        response = requests.get(geocode_url)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Construct location name from most specific to least specific components
+        components = []
+        if data.get('address1') and data.get('address2'):
+            components.append(f"{data['address1']} {data['address2']}")
+        elif data.get('address2'):
+            components.append(data['address2'])
+        if data.get('address3'):  # City
+            components.append(data['address3'])
+        if data.get('address4'):  # State/Province
+            components.append(data['address4'])
+        
+        if components:
+            return ", ".join(components)
+        else:
+            return f"Location at {lat:.2f}, {lon:.2f}"
+    except Exception as e:
+        print(f"Error in reverse geocoding: {e}")
+        return f"Location at {lat:.2f}, {lon:.2f}"  # Fallback to coordinates
+
 @tool
 def get_weather_along_route(route: Dict[str, Any], departure_time: datetime) -> List[Dict[str, Any]]:
     """
@@ -405,7 +435,11 @@ def get_weather_along_route(route: Dict[str, Any], departure_time: datetime) -> 
             lon, lat = point  # Unpack as longitude, latitude
             weather = get_weather_forecast.func(lat, lon, point_time)  # Weather API expects latitude first
             if weather:
-                weather['location'] = {'latitude': lat, 'longitude': lon}  # Store in consistent order
+                weather['location'] = {
+                    'latitude': lat,
+                    'longitude': lon,
+                    'name': reverse_geocode(lat, lon)
+                }
                 weather['time'] = point_time.isoformat()
                 weather_data.append(weather)
             else:
