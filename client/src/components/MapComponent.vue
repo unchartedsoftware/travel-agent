@@ -142,14 +142,11 @@ watch(() => props.weatherData, (newWeatherData) => {
         const marker = L.marker(data.position, {
           icon: createWeatherIcon(data.forecast, data.temperature, data.location, data.arrivalTime),
         })
-          // .bindPopup(`
-          //   <div class="weather-popup">
-          //     <p><b>Location:</b> ${data.location}</p>
-          //     <p><b>ETA:</b> ${data.arrivalTime}</p>
-          //     <p><b>Weather:</b> ${data.forecast}</p>
-          //     <p><b>Temperature:</b> ${data.temperature}°C</p>
-          //   </div>
-          // `)
+          .bindPopup(`
+            <div class="weather-popup">
+              <p><b>Location:</b> ${data.location}</p>
+            </div>
+          `)
           // .bindTooltip(`${data.forecast}, ${data.temperature}°C`, {
           //   permanent: true, // Keeps the tooltip always visible
           //   direction: 'top', // Positions the tooltip above the marker
