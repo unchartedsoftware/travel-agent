@@ -121,8 +121,11 @@ watch(() => props.route, (newRoute) => {
     if (routeLine) {
       routeLine.remove();
     }
-    routeLine = L.polyline(newRoute, { color: 'blue' }).addTo(map);
-    map.fitBounds(routeLine.getBounds());
+    if (newRoute && newRoute.length > 0) {
+      map.setView(newRoute[0], 10); // Center the map on the first point of the new route
+      routeLine = L.polyline(newRoute, { color: 'blue' }).addTo(map);
+      map.fitBounds(routeLine.getBounds());
+    }
   }
 });
 
