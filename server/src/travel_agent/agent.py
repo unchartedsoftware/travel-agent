@@ -505,12 +505,12 @@ def generate_itinerary_with_llm(origin: str, destination: str, departure_time_st
     inputs = {
         "origin": origin,
         "destination": destination,
-        "departure_time": departure_time.strftime('%Y-%m-%d %H:%M:%S'),
+        "departure_time": departure_time.isoformat(),
         # "route_summary": json.dumps({ "legs": route_info['route']['legs'], "summary": route_info['route_summary'] }),
         "route_info": { "legs": route_info['route']['legs'], "summary": route_info['route_summary'] },
         # "route_info": route_info,
         "weather_conditions": weather_summary,
-        "optimal_departure_time": optimal_departure_time.strftime('%Y-%m-%d %H:%M:%S'),
+        "optimal_departure_time": optimal_departure_time.isoformat(),
     }
 
     # Generate the itinerary using the LLM
@@ -521,7 +521,7 @@ def generate_itinerary_with_llm(origin: str, destination: str, departure_time_st
         "route_info": json.dumps(route_info),
         "weather_data": json.dumps(weather_data),
         "weather_summary": weather_summary,
-        "optimal_departure_time": optimal_departure_time.strftime('%Y-%m-%d %H:%M:%S'),
+        "optimal_departure_time": optimal_departure_time.isoformat(),
     }
 
 @tool

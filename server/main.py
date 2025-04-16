@@ -93,33 +93,10 @@ class PlanTripResponse(BaseModel):
     route_info: Any
     weather_data: Any
     optimal_departure_time: str
+    route_options: List[RouteOption]
 
-@app.post("/api/trial", response_model=List[str])
-async def plan_trip(request: TripRequest):
-    try:
-        logger.info(f"Processing trip request from {request.start} to {request.end}")
-
-        # Convert string to datetime
-        departure_time = datetime.fromisoformat(request.departure_time)
-        logger.debug(f"Parsed departure time: {departure_time}")
-
-        # Generate full itinerary using LLM
-        logger.debug("Generating itinerary")
-        itinerary = agent.passthrough_llm_function(
-            request.start,
-            request.end,
-            departure_time
-        )
-
-        return itinerary.split('\n')
-
-    except Exception as e:
-        logger.exception("Error processing trip request")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/plan-trip-agent", response_model=PlanTripResponse)
-async def ask_travel_agent(request: TripRequest):
-    prompt = f"I want a detailed itinerary for a trip from {request.start} to {request.end}, departing at {request.departure_time}. Please provide major stops along the way and weather conditions at each stop at the time of arrival. Include estimated travel time and any potential weather risks. Please provide best time to leave to avoid bad weather."
+def ask_travel_agent(start: str, end: str, departure_time: datetime) -> PlanTripResponse:
+    prompt = f"I want a detailed itinerary for a trip from {start} to {end}, departing at {departure_time}. Please provide major stops along the way and weather conditions at each stop at the time of arrival. Include estimated travel time and any potential weather risks. Please provide best time to leave to avoid bad weather."
     # Use the agent
     # config = {"configurable": {"thread_id": "abc123"}}
     all_messages = []
@@ -155,7 +132,7 @@ async def ask_travel_agent(request: TripRequest):
         "optimal_departure_time": optimal_departure_time
     }
 
-@app.post("/api/plan-trip", response_model=List[RouteOption])
+@app.post("/api/trial", response_model=List[str])
 async def plan_trip(request: TripRequest):
     try:
         logger.info(f"Processing trip request from {request.start} to {request.end}")
@@ -164,31 +141,39 @@ async def plan_trip(request: TripRequest):
         departure_time = datetime.fromisoformat(request.departure_time)
         logger.debug(f"Parsed departure time: {departure_time}")
 
-        # Get route info from OpenRoute Service
-        logger.debug("Fetching route information")
-        route_info = agent.get_driving_route.func([request.start, request.end], departure_time)
-        agent.add_legs_to_route(route_info['route'], departure_time)
-        route_info["route"]["geometry_decoded"] = openrouteservice.convert.decode_polyline(route_info["route"].get('geometry', ''))
-
-        if not route_info:
-            logger.warning("No route found")
-            raise HTTPException(status_code=404, detail="Route not found")
-
-        # Get weather data along route
-        logger.debug("Fetching weather data")
-        weather_data = agent.get_weather_along_route.func(route_info['route'], departure_time)
-
-        # Get optimal departure time
-        logger.debug("Calculating optimal departure time")
-        optimal_time = agent.suggest_departure_time.func(route_info['route'], weather_data, departure_time)
-
         # Generate full itinerary using LLM
         logger.debug("Generating itinerary")
-        itinerary = agent.generate_itinerary_with_llm.func(
+        itinerary = agent.passthrough_llm_function(
             request.start,
             request.end,
-            optimal_time.isoformat()
+            departure_time
         )
+
+        return itinerary.split('\n')
+
+    except Exception as e:
+        logger.exception("Error processing trip request")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/plan-trip-agent", response_model=PlanTripResponse)
+async def plan_trip_with_agent(request: TripRequest):
+    departure_time = datetime.fromisoformat(request.departure_time)
+    return ask_travel_agent(request.start, request.end, departure_time)
+
+@app.post("/api/plan-trip", response_model=PlanTripResponse)
+async def plan_trip(request: TripRequest):
+    try:
+        logger.info(f"Processing trip request from {request.start} to {request.end}")
+
+        # Convert string to datetime
+        departure_time = datetime.fromisoformat(request.departure_time)
+        logger.debug(f"Parsed departure time: {departure_time}")
+
+        logger.info("Asking travel agent for route and weather information")
+        result = ask_travel_agent(request.start, request.end, departure_time)
+        route_info = result["route_info"]
+        weather_data = result["weather_data"]
+        optimal_time = datetime.fromisoformat(result.get("optimal_departure_time", 0))
 
         # Extract route coordinates for visualization
         logger.debug("Extracting route coordinates")
@@ -270,7 +255,8 @@ async def plan_trip(request: TripRequest):
             )
 
         logger.info("Successfully processed trip request")
-        return [original_route, optimal_route] if optimal_route else [original_route]
+        result["route_options"] = [original_route, optimal_route] if optimal_route else [original_route]
+        return result
 
     except Exception as e:
         logger.exception("Error processing trip request")
