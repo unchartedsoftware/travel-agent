@@ -144,7 +144,7 @@ watch(() => props.weatherData, (newWeatherData) => {
         })
           .bindPopup(`
             <div class="weather-popup">
-              <p><b>Location:</b> ${data.location}</p>
+              <p>{data.location}</p>
             </div>
           `)
           // .bindTooltip(`${data.forecast}, ${data.temperature}°C`, {

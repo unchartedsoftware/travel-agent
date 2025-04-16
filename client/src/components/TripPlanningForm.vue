@@ -117,4 +117,9 @@ button {
 :deep(.p-button) {
   width: 100%;
 }
+button {
+  color: black !important;
+  stroke: black;
+  fill: black;
+}
 </style>
