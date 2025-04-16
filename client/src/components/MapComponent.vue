@@ -58,7 +58,6 @@ const getTemperatureColorClass = (temp: number): string => {
 const createWeatherIcon = (
   forecast: string,
   temperature: number,
-  location: string,
   arrivalTime: string
 ): L.DivIcon => {
   const iconName = getWeatherIcon(forecast);
@@ -140,11 +139,11 @@ watch(() => props.weatherData, (newWeatherData) => {
       if (map) { // Add null check
         
         const marker = L.marker(data.position, {
-          icon: createWeatherIcon(data.forecast, data.temperature, data.location, data.arrivalTime),
+          icon: createWeatherIcon(data.forecast, data.temperature, data.arrivalTime),
         })
           .bindPopup(`
             <div class="weather-popup">
-              <p>{data.location}</p>
+              <p>${data.location}</p>
             </div>
           `)
           // .bindTooltip(`${data.forecast}, ${data.temperature}°C`, {
