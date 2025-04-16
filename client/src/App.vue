@@ -20,7 +20,9 @@ const aiMessages = ref<string[]>([]);
 const handleTripPlan = async (formData: TripFormData) => {
   isLoading.value = true;
   aiMessages.value = [];
-
+  routeOptions.value = [];
+  weatherData.value = null;
+  currentRoute.value = [];
   try {
     // Make both API calls in parallel
     const [routeResponse, aiResponse] = await Promise.all([
