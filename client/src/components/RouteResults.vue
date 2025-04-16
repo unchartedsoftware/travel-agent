@@ -41,8 +41,8 @@ const getWeatherRiskSeverity = (risk: string) => {
           <template #header>
             <div class="flex align-items-center justify-content-between w-full">
               <div class="flex flex-column md:flex-row gap-3 align-items-start md:align-items-center flex-1">
-                <span class="whitespace-nowrap">Departure: {{ route.departureTime }}</span>
-                <span class="whitespace-nowrap">Duration: {{ route.estimatedDuration }}</span>
+                <span class="whitespace-nowrap">Departure: {{ route.departure_time }}</span>
+                <span class="whitespace-nowrap">Duration: {{ (route.estimated_duration/60, 1).toFixed(2) }} hours</span>
                 <Tag :severity="getScoreSeverity(route.score)" class="ml-auto">
                   Score: {{ route.score }}
                 </Tag>
@@ -67,6 +67,7 @@ const getWeatherRiskSeverity = (risk: string) => {
           </div>
         </AccordionTab>
       </Accordion>
+      {{  route }}
     </template>
   </Card>
 </template>
