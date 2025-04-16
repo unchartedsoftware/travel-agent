@@ -17,7 +17,7 @@
   <script setup lang="ts">
   import { ref, watch } from 'vue';
   // import type { WeatherStop } from '../models/types';
-  import { getCurrentForecast, getFutureForecastAtTime } from '../utilities/weather';
+  import { getCurrentForecast } from '../utilities/weather';
   
   const props = defineProps<{
     weather: any;
@@ -40,11 +40,11 @@
   const loading = ref(false);
   const unchartedOffice: [number, number] = [43.65035550554264, -79.36450868771557];
   
-  watch(() => props.weather, async (newLoc) => {
+  watch(() => props.weather.position, async (newLoc) => {
     if (!newLoc) return;
   
     loading.value = true;
-    weather.value = await getCurrentForecast(unchartedOffice);
+    weather.value = await getCurrentForecast(newLoc);
     loading.value = false;
   }, { immediate: true });
   </script>
