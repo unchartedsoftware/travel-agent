@@ -25,7 +25,7 @@ const handleTripPlan = async (formData: TripFormData) => {
   currentRoute.value = [];
   try {
     // Make both API calls in parallel
-    const [routeResponse, aiResponse] = await Promise.all([
+    const [aiResponse] = await Promise.all([
       fetch(`${API_BASE_URL}/api/plan-trip`, {
         method: 'POST',
         headers: {
@@ -37,34 +37,22 @@ const handleTripPlan = async (formData: TripFormData) => {
           departure_time: formData.departure_time
         })
       }),
-      fetch(`${API_BASE_URL}/api/plan-trip-agent`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          start: formData.start,
-          end: formData.end,
-          departure_time: formData.departure_time
-        })
-      })
     ]);
 
-    if (!routeResponse.ok || !aiResponse.ok) {
+    if (!aiResponse.ok) {
       throw new Error('Failed to fetch route options or AI suggestions');
     }
 
-    const [routeData, aiData] = await Promise.all([
-      routeResponse.json(),
+    const [aiData] = await Promise.all([
       aiResponse.json()
     ]);
 
     // Update route display with the first route option's coordinates
-    if (routeData[0]) {
-      currentRoute.value = routeData[0].coordinates;
+    if (aiData?.route_options?.[0]) {
+      currentRoute.value = aiData.route_options[0].coordinates;
 
       // Transform weather data for display using the stop's actual coordinates
-      weatherData.value = routeData[0].stops.map((stop: WeatherStop) => ({
+      weatherData.value = aiData.route_options[0].stops.map((stop: WeatherStop) => ({
         position: stop.coordinates as [number, number],
         forecast: stop.weather.split(',')[0],
         temperature: parseInt(stop.weather.split(',')[1]),
@@ -73,7 +61,8 @@ const handleTripPlan = async (formData: TripFormData) => {
       }));
     }
 
-    routeOptions.value = routeData;
+    // routeOptions.value = routeData;
+    routeOptions.value = aiData.route_options;
     aiMessages.value = aiData.ai_messages_content;
 
   } catch (error) {
